@@ -1,0 +1,58 @@
+{
+  "name": "Caso Rappi — sonda Open-Meteo (sin motor M2)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-om",
+      "name": "Al hacer clic",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "latitude", "value": "25.67" },
+            { "name": "longitude", "value": "-100.32" },
+            { "name": "hourly", "value": "precipitation" },
+            { "name": "forecast_days", "value": "2" },
+            { "name": "timezone", "value": "America/Monterrey" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-openmeteo",
+      "name": "Open-Meteo forecast",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    }
+  ],
+  "connections": {
+    "Al hacer clic": {
+      "main": [
+        [
+          {
+            "node": "Open-Meteo forecast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "active": false
+}

@@ -136,9 +136,25 @@ caso_tecnico/
 ├── n8n/                  # workflows importables + docker-compose (orquestación local)
 ├── n8n_bridge/         # API opcional POST /tick para n8n en Docker
 ├── django_viz/           # dashboard Django: datos, pipeline, calibración, figuras M1
+├── docker/               # entrypoint + README del contenedor único
+├── Dockerfile            # imagen: Django + monitor + POST /tick (puente n8n)
 ├── requirements.txt
 └── .env.example
 ```
+
+## Docker (un `docker run`)
+
+Dashboard, monitor periódico y API `POST /tick` en **un solo contenedor** (ver **`docker/README.md`**):
+
+```bash
+docker build -t caso-tecnico .
+docker run --rm --name caso-tecnico -p 8000:8000 -p 8090:8090 \
+  -v "$(pwd)/.env:/app/.env:ro" \
+  -v "$(pwd)/data:/app/data:ro" \
+  caso-tecnico
+```
+
+→ <http://127.0.0.1:8000/> · puente n8n: `http://127.0.0.1:8090/tick` (el monitor va en **dry-run** por defecto dentro del contenedor).
 
 ## Entorno (copiar y pegar)
 
@@ -236,7 +252,7 @@ Informe en `modulo1_diagnostico/Diagnóstico Operacional/`: compilar `Diagnósti
 
 Flujos importables en **`n8n/`** que disparan la **misma pasada operativa** que `monitor_loop.py` (vía script o API local). No reimplementan el motor M2 en nodos; **n8n programa el cuándo** y Python ejecuta el qué.
 
-- Guía: **`n8n/README.md`** · workflow recomendado (un solo canvas): **`n8n/workflows/rappi_pipeline_unificado.json`** · script **`scripts/n8n_run_tick.sh`** · puente HTTP opcional **`n8n_bridge/app.py`** (`POST /tick`).
+- Guía: **`n8n/README.md`** · workflow recomendado (un solo canvas): **`n8n/workflows/rappi_pipeline_unificado.json`** · script **`scripts/n8n_run_tick.sh`** · puente HTTP: **`scripts/run_n8n_bridge.sh`** (o `uvicorn n8n_bridge.app:app`, ver `n8n/README.md` si n8n va en Docker).
 
 ## Dashboard web (Django)
 

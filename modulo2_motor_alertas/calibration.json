@@ -1,0 +1,121 @@
+{
+  "zones": {
+    "Apodaca Centro": {
+      "precip_coef": 0.06583328340205843,
+      "sensitivity_index": 0.3437,
+      "mm_precip_healthy_to_saturation_linear": 9.11,
+      "alert_precip_mm_hr": 1.0,
+      "base_earnings_mxn": 55.2,
+      "recommended_earnings_mxn": 66.428
+    },
+    "Carretera Nacional": {
+      "precip_coef": 0.13391158213523752,
+      "sensitivity_index": 0.6992,
+      "mm_precip_healthy_to_saturation_linear": 4.48,
+      "alert_precip_mm_hr": 4.0,
+      "base_earnings_mxn": 55.8,
+      "recommended_earnings_mxn": 65.943
+    },
+    "Centro": {
+      "precip_coef": 0.06103387483446565,
+      "sensitivity_index": 0.3187,
+      "mm_precip_healthy_to_saturation_linear": 9.83,
+      "alert_precip_mm_hr": 1.35,
+      "base_earnings_mxn": 55.5,
+      "recommended_earnings_mxn": 67.14
+    },
+    "Cumbres Poniente": {
+      "precip_coef": 0.05311230787615703,
+      "sensitivity_index": 0.2773,
+      "mm_precip_healthy_to_saturation_linear": 11.3,
+      "alert_precip_mm_hr": 0.85,
+      "base_earnings_mxn": 55.4,
+      "recommended_earnings_mxn": 66.506
+    },
+    "Escobedo": {
+      "precip_coef": 0.06683572332713902,
+      "sensitivity_index": 0.349,
+      "mm_precip_healthy_to_saturation_linear": 8.98,
+      "alert_precip_mm_hr": 1.175,
+      "base_earnings_mxn": 55.6,
+      "recommended_earnings_mxn": 66.655
+    },
+    "Independencia": {
+      "precip_coef": 0.0747535823793007,
+      "sensitivity_index": 0.3903,
+      "mm_precip_healthy_to_saturation_linear": 8.03,
+      "alert_precip_mm_hr": 0.85,
+      "base_earnings_mxn": 55.8,
+      "recommended_earnings_mxn": 66.509
+    },
+    "La Fe": {
+      "precip_coef": 0.05901456408358915,
+      "sensitivity_index": 0.3081,
+      "mm_precip_healthy_to_saturation_linear": 10.17,
+      "alert_precip_mm_hr": 1.925,
+      "base_earnings_mxn": 55.7,
+      "recommended_earnings_mxn": 67.711
+    },
+    "MTY_Apodaca_Huinalá": {
+      "precip_coef": 0.084673775772658,
+      "sensitivity_index": 0.4421,
+      "mm_precip_healthy_to_saturation_linear": 7.09,
+      "alert_precip_mm_hr": 1.85,
+      "base_earnings_mxn": 55.15,
+      "recommended_earnings_mxn": 67.263
+    },
+    "MTY_Guadalupe": {
+      "precip_coef": 0.05879510359429005,
+      "sensitivity_index": 0.307,
+      "mm_precip_healthy_to_saturation_linear": 10.2,
+      "alert_precip_mm_hr": 6.55,
+      "base_earnings_mxn": 55.4,
+      "recommended_earnings_mxn": 68.482
+    },
+    "Mitras Centro": {
+      "precip_coef": 0.050338467776033284,
+      "sensitivity_index": 0.2628,
+      "mm_precip_healthy_to_saturation_linear": 11.92,
+      "alert_precip_mm_hr": 0.55,
+      "base_earnings_mxn": 55.3,
+      "recommended_earnings_mxn": 65.869
+    },
+    "San Nicolás": {
+      "precip_coef": 0.058999197289227076,
+      "sensitivity_index": 0.3081,
+      "mm_precip_healthy_to_saturation_linear": 10.17,
+      "alert_precip_mm_hr": 6.55,
+      "base_earnings_mxn": 55.4,
+      "recommended_earnings_mxn": 68.8
+    },
+    "San Pedro": {
+      "precip_coef": 0.06702693879872662,
+      "sensitivity_index": 0.35,
+      "mm_precip_healthy_to_saturation_linear": 8.95,
+      "alert_precip_mm_hr": 2.0,
+      "base_earnings_mxn": 55.95,
+      "recommended_earnings_mxn": 66.774
+    },
+    "Santa Catarina": {
+      "precip_coef": 0.10263334690193383,
+      "sensitivity_index": 0.5359,
+      "mm_precip_healthy_to_saturation_linear": 5.85,
+      "alert_precip_mm_hr": 0.825,
+      "base_earnings_mxn": 55.75,
+      "recommended_earnings_mxn": 66.834
+    },
+    "Santiago": {
+      "precip_coef": 0.19151721493283808,
+      "sensitivity_index": 1.0,
+      "mm_precip_healthy_to_saturation_linear": 3.13,
+      "alert_precip_mm_hr": 4.0,
+      "base_earnings_mxn": 55.8,
+      "recommended_earnings_mxn": 67.114
+    }
+  },
+  "global": {
+    "healthy_ratio_max": 1.2,
+    "saturation_ratio": 1.8,
+    "incentive_cap_pct": 0.35
+  }
+}

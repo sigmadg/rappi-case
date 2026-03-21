@@ -1,0 +1,47 @@
+% Compilar: cd motor_reglas && pdflatex motor_reglas.tex
+% Objetivo: 1 página — umbrales y reglas del motor con vínculo a evidencia histórica (Módulo 1).
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\geometry{margin=1.9cm}
+\setlist[itemize]{nosep,leftmargin=1.3em,topsep=2pt,parsep=0pt}
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+
+\title{\textbf{Módulo 2 --- Justificación del motor de alertas}\\[0.2em]
+{\normalsize Umbrales y reglas con evidencia en datos históricos (1 página)}}
+\author{}
+\date{}
+
+\begin{document}
+\sloppy
+\maketitle
+\vspace{-0.6em}
+
+\noindent\textbf{Objetivo.} Documentar por qué los parámetros y las reglas IF-THEN del motor (\texttt{decision\_engine.py}) están \textbf{calibrados con el mismo panel} que el Módulo~1 (\texttt{RAW\_DATA}: 30 días $\times$ 24\,h $\times$ 14 zonas) y cómo se combinan con el pronóstico en vivo.
+
+\paragraph{Evidencia en datos históricos.}
+El notebook \texttt{01\_diagnostico\_operacional} muestra que la precipitación co-mueve el \textbf{ratio} pedidos/repartidores: correlación global de Pearson precipitación--ratio $\approx 0{,}32$; $\mathbb{P}(\text{saturación}\mid \text{precip} > 0{,}5\,\mathrm{mm/h})$ es del orden de \textbf{8 veces} mayor que con precipitación baja; un MCO agregado da coeficiente marginal positivo de precipitación sobre el ratio (control por hora y zona). Eso \textbf{justifica} reglas condicionadas a lluvia y \textbf{heterogeneidad por zona} (pendientes distintas en P3).
+
+\paragraph{Qué se estima del Excel y va a \texttt{calibration.json}.}
+(vía \texttt{export\_calibration\_from\_m1.py}, misma lógica que el notebook.)
+\begin{itemize}
+  \item Misma definición de ratio y saturación ($>1{,}8$) que M1; en \texttt{global}: \texttt{healthy\_ratio\_max} y \texttt{saturation\_ratio} (1{,}2 y 1{,}8).
+  \item \texttt{precip\_coef} y \texttt{sensitivity\_index}: regresión por zona como P3 (precipitación + efectos fijos de hora).
+  \item \texttt{alert\_precip\_mm\_hr}: p75 de precipitación en filas saturación; si p75 $<0{,}5$ mm/h, referencia 6{,}55 mm/h (saturación seca en el panel).
+  \item \texttt{mm\_precip\_healthy\_to\_saturation\_linear} $=0{,}6/\beta_z$ con $\Delta\rho=0{,}6$ (tramo 1{,}2--1{,}8).
+  \item \texttt{base\_earnings\_mxn}: mediana de \texttt{EARNINGS}; tope de incentivo 0{,}35 en \texttt{global}.
+\end{itemize}
+
+\paragraph{Reglas en tiempo de ejecución.}
+Ventana horaria (p.\,ej.\ 2\,h): sin alerta si $\max$ precip.\ $<$ umbral. Si no: $\hat\rho = \max(0{,}3,\, 1{,}05 + \beta_z \cdot \text{precip})$. Riesgo en cuatro niveles (BAJO--CRITICO) según $\hat\rho$ vs.\ $1{,}8$ y exceso lluvia/umbral. Incentivo: suma de componentes por tier, sensibilidad y exceso, con tope 35\,\%. Debounce evita repetir la misma severidad en el TTL; permite escalada.
+
+\paragraph{Pronóstico y mapas.}
+\textbf{Open-Meteo} (sin API key): precipitación horaria mm/h, zona horaria Monterrey. Coordenadas por zona: punto dentro del polígono WKT (\texttt{ZONE\_POLYGONS}) o centroides \texttt{ZONE\_INFO} si el WKT falta/trunca. Opción \texttt{--recalibrate} en \texttt{run\_alert\_engine.py} regenera el JSON desde el Excel antes de la API.
+
+\end{document}

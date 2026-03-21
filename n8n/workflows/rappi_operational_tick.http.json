@@ -1,0 +1,65 @@
+{
+  "name": "Caso Rappi — tick via HTTP (puente local)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-rappi",
+      "name": "Al hacer clic",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8090/tick",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "dry_run",
+              "value": "true"
+            },
+            {
+              "name": "demo",
+              "value": "false"
+            },
+            {
+              "name": "force_send",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-tick-bridge",
+      "name": "POST /tick (FastAPI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    }
+  ],
+  "connections": {
+    "Al hacer clic": {
+      "main": [
+        [
+          {
+            "node": "POST /tick (FastAPI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "active": false
+}

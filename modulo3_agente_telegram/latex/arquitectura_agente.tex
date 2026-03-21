@@ -1,0 +1,33 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\geometry{margin=2.2cm}
+\title{Módulo 3 --- Agente y Telegram}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Flujo}
+\texttt{Open-Meteo} $\rightarrow$ motor experto Módulo 2 (\texttt{decision\_engine}, contexto JSON) $\rightarrow$ \textbf{RAG-lite}: el contexto recuperado es el propio dict del motor (sin corpus externo) $\rightarrow$ LLM en modo JSON (\textbf{Ollama} con \texttt{format: json}; \textbf{OpenAI} vía \textbf{LangChain} LCEL por defecto, o SDK directo con \texttt{USE\_LANGCHAIN=0}) o plantilla determinista si falla la llamada $\rightarrow$ \texttt{python-telegram-bot}.
+
+\section*{Mensaje (criterio 10 segundos)}
+El texto incluye: zona, nivel de riesgo, intensidad de lluvia esperada, referencia histórica comparable, ratio proyectado vs umbral 1.8, acción numérica (MXN y minutos) y zonas secundarias.
+
+\section*{Coste estimado}
+\begin{itemize}
+  \item Open-Meteo + Telegram: \textbf{0 USD} para el volumen de prueba.
+  \item Ollama (Mixtral u otro modelo local): \textbf{0 USD} API; coste de electricidad/GPU local.
+  \item OpenAI \texttt{gpt-4o-mini}: del orden de \textbf{\$0.001--0.01} por alerta según longitud (ver facturación actual en OpenAI).
+  \item LangChain: incluido en la ruta OpenAI por defecto; mismo coste de tokens LLM (dependencias ya en \texttt{requirements.txt}); \texttt{USE\_LANGCHAIN=0} para omitir.
+\end{itemize}
+
+\section*{Q\&A rápido}
+\textbf{Falsos positivos:} confirmación con segunda lectura de radar/observación y TTL de deduplicación.\\
+\textbf{Alert fatigue:} sólo emitir si supera umbral por zona; ventanas; resumen diario opcional (bonus).\\
+\textbf{Escalado a otras ciudades:} parametrizar polígonos, centroides y recalibración de \texttt{calibration.json} por ciudad.
+
+\end{document}

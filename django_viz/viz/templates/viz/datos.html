@@ -1,0 +1,118 @@
+{% extends "viz/base.html" %}
+{% block title %}Datos{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">Análisis de datos (RAW_DATA)</h1>
+<p class="text-muted">Vista rápida del Excel: preview, estadísticos numéricos, centroides <code>ZONE_INFO</code>.</p>
+
+{% if error %}
+<div class="alert alert-warning">{{ error }}</div>
+{% else %}
+
+{% if zone_balance_note %}
+<div class="alert alert-secondary border border-secondary mb-4" style="--bs-alert-bg: rgba(255,255,255,0.06); color: #e8ecf4;">
+  {{ zone_balance_note }}
+</div>
+{% endif %}
+
+<div class="row g-4 mb-4">
+  {% if chart_labels %}
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">{{ chart_title|default:"Por zona" }}</div>
+      <div class="card-body">
+        <canvas id="chartZones" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% if chart_hours_labels %}
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">Ratio medio por hora del día</div>
+      <div class="card-body">
+        <canvas id="chartHours" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if zone_counts_html %}
+<div class="card mb-4">
+  <div class="card-header">Conteo de filas por zona (verificación)</div>
+  <div class="card-body table-responsive small">
+    <p class="small mb-2" style="color:#a8b8cc!important">Debería ser constante (p. ej. 720) en un panel 30×24 completo.</p>
+    {{ zone_counts_html|safe }}
+  </div>
+</div>
+{% endif %}
+
+{% if preview_html %}
+<div class="card mb-4">
+  <div class="card-header">Primeras filas (RAW_DATA)</div>
+  <div class="card-body table-responsive">{{ preview_html|safe }}</div>
+</div>
+{% endif %}
+
+{% if describe_html %}
+<div class="card mb-4">
+  <div class="card-header">describe() — columnas numéricas</div>
+  <div class="card-body table-responsive">{{ describe_html|safe }}</div>
+</div>
+{% endif %}
+
+{% if zone_info_html %}
+<div class="card mb-4">
+  <div class="card-header">ZONE_INFO</div>
+  <div class="card-body table-responsive">{{ zone_info_html|safe }}</div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if chart_labels %}
+<script>
+  const labels = {{ chart_labels_json|safe }};
+  const values = {{ chart_values_json|safe }};
+  new Chart(document.getElementById('chartZones'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{ label: "{{ chart_y_label|default:'Valor'|escapejs }}", data: values, backgroundColor: 'rgba(255,48,8,0.55)', borderWidth: 0 }]
+    },
+    options: {
+      plugins: { legend: { labels: { color: '#d5dde8' } } },
+      scales: {
+        x: { ticks: { color: '#c5d0e0', maxRotation: 45, minRotation: 45, font: { size: 10 } } },
+        y: { ticks: { color: '#8b9bb4' }, beginAtZero: true }
+      }
+    }
+  });
+</script>
+{% endif %}
+{% if chart_hours_labels %}
+<script>
+  const hLabels = {{ chart_hours_labels_json|safe }};
+  const hVals = {{ chart_hours_values_json|safe }};
+  new Chart(document.getElementById('chartHours'), {
+    type: 'line',
+    data: {
+      labels: hLabels,
+      datasets: [{ label: 'Ratio medio', data: hVals, borderColor: '#7eb8ff', backgroundColor: 'rgba(126,184,255,0.15)', fill: true, tension: 0.25 }]
+    },
+    options: {
+      plugins: { legend: { labels: { color: '#d5dde8' } } },
+      scales: {
+        x: { ticks: { color: '#8b9bb4' } },
+        y: { ticks: { color: '#8b9bb4' } }
+      }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

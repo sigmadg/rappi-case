@@ -1,0 +1,25 @@
+# n8n local. Opción A: solo UI; el pipeline Python se invoca vía HTTP al puente
+# (ver n8n/README.md) o n8n instalado en el mismo host que el repo (Execute Command).
+#
+# Uso:
+#   export CASO_TECNICO_ROOT=/ruta/absoluta/caso_tecnico
+#   docker compose -f n8n/docker-compose.yml up -d
+#
+# UI: http://127.0.0.1:5678  (crear usuario la primera vez)
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - TZ=America/Monterrey
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  n8n_data:

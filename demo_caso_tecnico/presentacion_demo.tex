@@ -1,0 +1,329 @@
+% Presentación demo — Caso técnico Rappi (Módulos 1, 2 y 3)
+% Compilar: pdflatex presentacion_demo.tex (dos veces)
+\documentclass[aspectratio=169,spanish]{beamer}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+
+\usetheme{Madrid}
+\usecolortheme{default}
+
+\definecolor{rappiaccent}{HTML}{FF3008}
+\setbeamercolor{structure}{fg=rappiaccent}
+\setbeamertemplate{navigation symbols}{}
+
+\title[Sistema de alertas]{Sistema de alertas operacionales}
+\subtitle{Caso técnico Rappi · Data-driven + motor experto + agente Telegram}
+\author{Demo técnica}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Agenda}
+  \tableofcontents
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\section{Visión general}
+
+\begin{frame}{Problema y enfoque}
+  \begin{itemize}
+    \item \textbf{Contexto:} operación de delivery sensible al clima (lluvia, saturación de repartidores).
+    \item \textbf{Objetivo:} avisar con \textbf{anticipación} (ventana corta) y \textbf{números accionables} (zonas, riesgo, incentivos en MXN).
+    \item \textbf{Enfoque:} \emph{data-driven first} — lo que decide no es “opinión del modelo”, sino reglas y coeficientes \textbf{calibrados con histórico}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Los tres módulos en una frase}
+  \begin{description}
+    \item[Módulo 1] \textbf{Diagnóstico:} del Excel y el notebook salen sensibilidades, umbrales y coeficientes por zona.
+    \item[Módulo 2] \textbf{Motor:} pronóstico en vivo (Open-Meteo) + reglas IF-THEN + salida estructurada.
+    \item[Módulo 3] \textbf{Agente:} el mismo contexto en JSON → lenguaje natural (LLM o plantilla) → \textbf{Telegram}.
+  \end{description}
+\end{frame}
+
+\begin{frame}{Arquitectura del pipeline}
+  \centering
+  \begin{tikzpicture}[
+    node distance=6mm and 10mm,
+    box/.style={draw, rounded corners, minimum width=2.6cm, minimum height=0.9cm, align=center, font=\small},
+    arr/.style={-{Latex[length=2mm]}, thick}
+  ]
+    \node[box, fill=gray!12] (d) {Dataset\\Excel + zonas};
+    \node[box, fill=orange!15, right=of d] (m1) {\textbf{M1}\\Diagnóstico};
+    \node[box, fill=yellow!20, right=of m1] (cal) {\texttt{calibration.json}};
+    \node[box, fill=cyan!12, below=of m1] (api) {Open-Meteo\\forecast};
+    \node[box, fill=green!15, right=of api] (m2) {\textbf{M2}\\Motor experto};
+    \node[box, fill=blue!12, right=of m2] (m3) {\textbf{M3}\\LLM + Telegram};
+    \draw[arr] (d) -- (m1);
+    \draw[arr] (m1) -- (cal);
+    \draw[arr] (cal) |- (m2);
+    \draw[arr] (api) -- (m2);
+    \draw[arr] (m2) -- (m3);
+  \end{tikzpicture}
+
+  \vspace{0.6em}
+  \small
+  El M3 reutiliza el \textbf{mismo motor} que el M2; añade formato operativo y canal.
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\section{Módulo 1 — Diagnóstico operacional}
+
+\begin{frame}{Módulo 1: rol en el sistema}
+  \begin{itemize}
+    \item \textbf{Entrada:} panel histórico (\texttt{data/rappi\_delivery\_case\_data.xlsx}): órdenes, earnings, precipitación, hora, zona, saturación, etc.
+    \item \textbf{Herramienta principal:} notebook \texttt{01\_diagnostico\_operacional.ipynb}.
+    \item \textbf{Salida conceptual:} entender \textbf{ratio}, saturación y relación precipitación--operación \textbf{por zona}.
+    \item \textbf{Salida para ingeniería:} parámetros que alimentan \texttt{calibration.json} (vía export o notebook alineado).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Módulo 1: qué se estima por zona}
+  \small
+  \begin{itemize}
+    \item \textbf{\texttt{precip\_coef}} — efecto marginal de la precipitación sobre el ratio (regresión tipo notebook).
+    \item \textbf{\texttt{sensitivity\_index}} — qué tan “reactive” es la zona respecto al resto (normalización de coeficientes).
+    \item \textbf{\texttt{alert\_precip\_mm\_hr}} — umbral de lluvia a partir del cual tiene sentido alertar (p.\,ej. percentil en condiciones de saturación).
+    \item \textbf{\texttt{mm\_precip\_healthy\_to\_saturation\_linear}} — orden de magnitud mm/h en el tramo saludable $\rightarrow$ saturación.
+    \item \textbf{\texttt{base\_earnings\_mxn}} — referencia de incentivo base para calcular \texttt{earnings\_from} $\rightarrow$ \texttt{earnings\_to}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Cinco hallazgos cuantificados (patrones $\rightarrow$ M2)}
+  \footnotesize
+  \begin{enumerate}
+    \item \textbf{Panel:} $30\times24\times14 = 10\,080$ filas; métrica \texttt{ratio} = ORDERS/CONNECTED\_RT; saturación si $>1{,}8$.
+    \item \textbf{Precip vs ratio (con controles):} correlación $\approx 0{,}32$; OLS \texttt{ratio $\sim$ precip + C(HOUR) + C(ZONE)} $\Rightarrow$ Adj.\ $R^2 \approx 0{,}72$ (notebook P2).
+    \item \textbf{Condicional:} $\mathbb{P}(\text{sat}\mid \text{precip}>0{,}5)\approx 0{,}31$ vs $\approx 0{,}04$ si precip $\leq 0{,}5$ mm/h ($\sim 8\times$).
+    \item \textbf{Por zona:} sensibilidad y \texttt{mm} para pasar tramo saludable$\rightarrow$saturación difieren (ej.\ Santiago vs Mitras en \texttt{calibration.json}).
+    \item \textbf{Datos/geo:} 12/14 WKT válidos; motor usa centroides como respaldo. Umbrales \texttt{alert\_precip\_mm\_hr} exportados por zona.
+  \end{enumerate}
+  \vspace{0.25em}
+  \tiny Documento: \texttt{modulo1\_diagnostico/HALLAZGOS\_M1.md}
+\end{frame}
+
+\begin{frame}{Módulo 1: documentación y figuras}
+  \begin{itemize}
+    \item Informe LaTeX/PDF en \texttt{modulo1\_diagnostico/Diagnóstico Operacional/}.
+    \item Figuras generadas por el notebook en \texttt{modulo1\_diagnostico/figures/}.
+    \item Script \texttt{export\_calibration\_from\_m1.py} (M2) reproduce la lógica del notebook para regenerar \texttt{calibration.json} sin abrir Jupyter.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Módulo 1 $\rightarrow$ Módulo 2}
+  \centering
+  \begin{tikzpicture}
+    \node[draw, rounded corners, minimum width=8cm, minimum height=2.2cm, align=left, font=\small] {
+      \textbf{Puente M1 $\rightarrow$ M2}\\[0.3em]
+      Excel + notebook $\Rightarrow$ conocimiento cuantitativo por zona\\[0.2em]
+      $\Downarrow$\\[0.2em]
+      \texttt{calibration.json} \quad (umbrales + coeficientes + sensibilidad)
+    };
+  \end{tikzpicture}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\section{Módulo 2 — Motor de alertas}
+
+\begin{frame}{Módulo 2: ingestión meteorológica}
+  \begin{itemize}
+    \item \textbf{API:} Open-Meteo (sin API key) — pronóstico horario de precipitación.
+    \item \textbf{Unidades:} mm acumulados por hora $\approx$ intensidad mm/h (alineado al dataset).
+    \item \textbf{Zona horaria:} \texttt{America/Monterrey} en el cliente.
+    \item \textbf{Horizonte por defecto:} 2 horas (balance precisión vs tiempo de reacción).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Módulo 2: geografía (WKT y centroides)}
+  \begin{itemize}
+    \item Polígonos WKT por zona en el Excel; \textbf{Shapely} para geometría.
+    \item Consulta al clima en un punto \textbf{representativo dentro del polígono} (no solo centroide arbitrario cuando hay WKT válido).
+    \item Si el WKT falla, \textbf{respaldo} con coordenadas de \texttt{ZONE\_INFO}.
+    \item Opcional: agregación por rejilla (\texttt{geo\_pipeline}) para escenarios más finos.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Módulo 2: motor experto (\texttt{decision\_engine.py})}
+  \small
+  \begin{enumerate}
+    \item Para cada zona: máxima precipitación prevista en la ventana vs \texttt{alert\_precip\_mm\_hr}.
+    \item Elegir zona \textbf{primaria} (mayor exceso sobre umbral).
+    \item Proyección de \textbf{ratio} con \texttt{precip\_coef} (techo/piso razonables).
+    \item Clasificación de \textbf{riesgo:} BAJO, MEDIO, ALTO, CRITICO.
+    \item \textbf{Incentivo numérico:} multiplicador acotado que sube con riesgo, sensibilidad y exceso de lluvia.
+    \item \textbf{Zonas secundarias} a vigilar (top sensibilidad).
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Módulo 2: anti alert fatigue (debounce)}
+  \begin{itemize}
+    \item Estado en \texttt{.alert\_state.json} por zona.
+    \item No reenvía la \textbf{misma o menor severidad} dentro de un \textbf{TTL} (por defecto $\sim$45\,min).
+    \item \textbf{Sí reenvía} si hay \textbf{escalada} (p.\,ej.\ MEDIO $\rightarrow$ CRITICO).
+    \item TTL configurable: variable \texttt{ALERT\_DEBOUNCE\_TTL\_SEC} en \texttt{caso\_tecnico/.env}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Módulo 2: cómo ejecutarlo}
+  \texttt{modulo2\_motor\_alertas/run\_alert\_engine.py}
+  \vspace{0.5em}
+  \begin{itemize}
+    \item \texttt{python run\_alert\_engine.py} — pronóstico real, salida por consola.
+    \item \texttt{python run\_alert\_engine.py --demo} — simula lluvia fuerte en Santiago sin red.
+    \item \texttt{python run\_alert\_engine.py --recalibrate} — regenera \texttt{calibration.json} desde el Excel y luego ejecuta.
+  \end{itemize}
+  \vspace{0.3em}
+  \small Documento de reglas: \texttt{latex/motor\_reglas.tex} $\rightarrow$ PDF de una página.
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\section{Módulo 3 — Agente Telegram}
+
+\begin{frame}{Módulo 3: qué añade al M2}
+  \begin{itemize}
+    \item Mismo flujo meteorológico + \textbf{mismo motor M2}.
+    \item El contexto experto va a \textbf{RAG-lite}: el “retrieval” es el \textbf{JSON estructurado} del motor, no documentos arbitrarios.
+    \item \textbf{LLM} (Ollama / OpenAI) genera JSON con esquema fijo; con \textbf{OpenAI}, orquestación con \textbf{LangChain} (LCEL) por defecto; validación y fallback a \textbf{plantilla determinista}.
+    \item Envío con \textbf{python-telegram-bot} al canal configurado.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Módulo 3: mensaje para el jefe de operaciones ($\sim$10\,s)}
+  El texto busca incluir:
+  \begin{itemize}
+    \item Zona y \textbf{nivel de riesgo}
+    \item Qué se espera en la ventana (lluvia, horizonte)
+    \item Paralelo \textbf{histórico} (frase guía desde el pipeline)
+    \item Acción: \textbf{earnings X $\rightarrow$ Y MXN} y \textbf{minutos}
+    \item \textbf{Zonas secundarias} a monitorear
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Módulo 3: configuración y seguridad}
+  \begin{itemize}
+    \item \texttt{caso\_tecnico/.env}: \texttt{TELEGRAM\_BOT\_TOKEN}, \texttt{TELEGRAM\_CHAT\_ID}.
+    \item Bot como \textbf{administrador} del canal con permiso de publicar.
+    \item \texttt{LLM\_PROVIDER}: \texttt{ollama} $|$ \texttt{openai} $|$ \texttt{auto}.
+    \item \textbf{Nunca} commitear tokens; revocar en BotFather si hay fuga.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Módulo 3: comandos útiles para la demo}
+  \small
+  Desde la raíz \texttt{caso\_tecnico/}:
+  \vspace{0.4em}
+  \begin{block}{Pruebas}
+    \texttt{python modulo3\_agente\_telegram/run\_agent.py --test-telegram}\\[0.2em]
+    \texttt{python modulo3\_agente\_telegram/run\_agent.py --demo --dry-run}\\[0.2em]
+    \texttt{python modulo3\_agente\_telegram/run\_agent.py --demo --validate}
+  \end{block}
+  \begin{block}{Canal en vivo}
+    \texttt{python modulo3\_agente\_telegram/run\_agent.py --demo --force-send}
+  \end{block}
+\end{frame}
+
+\begin{frame}{Módulo 3: extensiones (bonus)}
+  \begin{itemize}
+    \item \textbf{Debounce visible:} si se suprime la alerta por TTL, se envía un \textbf{aviso corto} a Telegram (salvo \texttt{--dry-run}).
+    \item \textbf{Registro:} \texttt{.alert\_events.jsonl} por cada alerta enviada.
+    \item \textbf{Resumen diario:} \texttt{--daily-summary} (lista de eventos + contraste con archivo Open-Meteo del día).
+    \item Cron nocturno posible para el resumen (ver README del módulo 3).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Módulo 3: monitor continuo (\texttt{monitor\_loop.py})}
+  \small
+  \begin{itemize}
+    \item \textbf{Bucle operativo:} cada $N$ segundos vuelve a llamar a Open-Meteo, ejecuta el \textbf{mismo motor M2} y aplica debounce antes de Telegram.
+    \item \textbf{Orquestación:} cadena \textbf{LangChain LCEL} (timestamp $\rightarrow$ \texttt{run\_operational\_tick} $\rightarrow$ resumen); no sustituye las reglas del experto.
+    \item \textbf{Intervalo por defecto:} \textbf{600\,s} (10\,min), vía \texttt{MONITOR\_INTERVAL\_SEC} en \texttt{.env} o flag \texttt{--interval-sec}. Mínimo aplicado en código: \textbf{60\,s}.
+    \item \textbf{Auditoría / UI:} cada ciclo se añade a \texttt{modulo2\_motor\_alertas/.monitor\_ticks.jsonl} y se actualiza \texttt{.monitor\_status.json} (lo lee el dashboard).
+  \end{itemize}
+  \vspace{0.25em}
+  \footnotesize
+  \texttt{python modulo3\_agente\_telegram/monitor\_loop.py} \quad|\quad \texttt{--once --demo --dry-run} (prueba)
+\end{frame}
+
+\begin{frame}{Monitor vs debounce (dos relojes distintos)}
+  \begin{itemize}
+    \item \textbf{Monitor} = cada cuánto se \textbf{consulta} el clima y se reevalúa si \emph{podría} haber alerta (típ.\ cada 10\,min).
+    \item \textbf{Debounce} = cada cuánto se permite \textbf{repetir} la misma severidad en la misma zona por Telegram (TTL $\sim$45\,min, \texttt{ALERT\_DEBOUNCE\_TTL\_SEC}).
+    \item \textbf{Escalada} MEDIO$\rightarrow$CRITICO (y similares) \textbf{sí} dispara envío aunque no haya pasado el TTL completo.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\section{Dashboard web (Django)}
+
+\begin{frame}{Dashboard \texttt{django\_viz/}}
+  \small
+  \begin{itemize}
+    \item Interfaz local para \textbf{explorar el Excel} (preview, \texttt{describe}, \texttt{ZONE\_INFO}), gráficos por zona y ratio por hora.
+    \item Vista \textbf{Pipeline} (diagrama M1$\rightarrow$M2$\rightarrow$M3) y \textbf{Calibración} (\texttt{calibration.json} formateado).
+    \item Galería de \textbf{figuras del notebook} (\texttt{modulo1\_diagnostico/figures/}).
+    \item Ruta \textbf{\texttt{/monitor/}}: último ciclo del \texttt{monitor\_loop}, historial de ticks y últimas alertas en \texttt{.alert\_events.jsonl} (refresco automático vía \texttt{/api/monitor.json}).
+    \item Desde inicio: botones para \textbf{forzar envío} a Telegram (\texttt{run\_agent.py --force-send}) — solo en entorno de confianza.
+  \end{itemize}
+  \vspace{0.35em}
+  \footnotesize
+  \texttt{cd django\_viz \&\& python manage.py runserver 8080} \;\;$\Rightarrow$\;\; \texttt{/monitor/}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\section{Demo en vivo y cierre}
+
+\begin{frame}{Sugerencia de guion (8--12 minutos)}
+  \small
+  \begin{enumerate}
+    \item Arquitectura (esta presentación o diagrama del pipeline).
+    \item \textbf{M1/M2:} abrir \texttt{calibration.json} (umbral + sensibilidad de una zona).
+    \item \texttt{cd modulo2\_motor\_alertas \&\& python run\_alert\_engine.py --demo}.
+    \item \textbf{M3:} \texttt{run\_agent.py --demo --dry-run} $\rightarrow$ \texttt{--force-send} o canal real (\texttt{--test-telegram} primero si hace falta).
+    \item \textbf{Monitor:} \texttt{monitor\_loop.py --once --demo --dry-run}; en otra terminal, dashboard \texttt{/monitor/} con \texttt{runserver}.
+    \item Opcional: \texttt{--daily-summary --dry-run} si ya hay líneas en \texttt{.alert\_events.jsonl}.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Checklist de entregables (repo)}
+  \footnotesize
+  \begin{itemize}
+    \item \textbf{M1:} notebook + figuras + informe LaTeX en \texttt{modulo1\_diagnostico/}.
+    \item \textbf{M2:} \texttt{decision\_engine.py}, \texttt{debounce.py}, cliente Open-Meteo, \texttt{calibration.json}, \texttt{run\_alert\_engine.py}.
+    \item \textbf{M3:} \texttt{rag\_chain.py}, Telegram, \texttt{run\_agent.py}, monitor LangChain, registro JSONL.
+    \item \textbf{Ops:} \texttt{docs/criterios\_evaluacion\_demo.md}, \texttt{modulo3\_agente\_telegram/docs/qa\_arquitectura.md}, \texttt{docs/retroalimentacion\_y\_escalado.md}, \texttt{.env.example}, \texttt{requirements.txt}.
+    \item \textbf{Demo:} esta presentación (\texttt{demo\_caso\_tecnico/presentacion\_demo.tex}) + PDF generado.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Riesgos y mitigaciones (Q\&A)}
+  \small
+  \begin{itemize}
+    \item \textbf{Falso positivo meteorológico:} umbral por zona + segunda lectura operativa (radar); evolución: confirmar con observaciones.
+    \item \textbf{Alert fatigue:} debounce + escalada; mensajes cortos y accionables.
+    \item \textbf{Escalado a otra ciudad:} nuevo Excel + recalibración + mismos scripts; \texttt{TELEGRAM\_CHAT\_ID} por canal.
+  \end{itemize}
+  \vspace{0.3em}
+  \footnotesize
+  Guía de demo rúbrica: \texttt{docs/criterios\_evaluacion\_demo.md}. Q\&A: \texttt{modulo3\_agente\_telegram/docs/qa\_arquitectura.md}, \texttt{docs/retroalimentacion\_y\_escalado.md}.
+\end{frame}
+
+\begin{frame}{}
+  \centering
+  {\Huge Gracias}
+
+  \vspace{1.2em}
+  {\large Preguntas}
+\end{frame}
+
+\end{document}

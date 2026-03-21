@@ -1,0 +1,83 @@
+{% extends "viz/base.html" %}
+{% block title %}Inicio{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Panel de visualización</h1>
+<p class="text-muted mb-4">Explora el dataset del <strong>Módulo 1</strong>, la calibración del <strong>Módulo 2</strong> y el flujo hacia el agente <strong>Módulo 3</strong> (Telegram).</p>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted">RAW_DATA</h2>
+        {% if n_rows %}
+        <p class="display-6 mb-0">{{ n_rows|floatformat:0 }}</p>
+        <small class="text-muted">filas · {{ n_zones }} zonas</small>
+        {% else %}
+        <p class="text-warning mb-0">Sin datos</p>
+        <small class="text-muted">{{ data_error }}</small>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted">calibration.json</h2>
+        {% if calibration_ok %}
+        <p class="mb-0"><span class="badge bg-success">Disponible</span></p>
+        {% else %}
+        <p class="mb-0"><span class="badge bg-secondary">No encontrado</span></p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted">Figuras notebook</h2>
+        <p class="display-6 mb-0">{{ n_figures }}</p>
+        <small class="text-muted">imágenes en <code>modulo1_diagnostico/figures</code></small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Raíz del proyecto (lectura)</div>
+  <div class="card-body">
+    <code>{{ project_root }}</code>
+  </div>
+</div>
+
+<div class="card mb-4 border" style="border-color: var(--accent) !important;">
+  <div class="card-header" style="background: rgba(255,48,8,0.12);">Módulo 3 — Enviar a Telegram (forzar)</div>
+  <div class="card-body">
+    <p class="small mb-3" style="color:#c5d0e0;">
+      Ejecuta <code>run_agent.py --force-send</code>: <strong>ignora el debounce</strong> (TTL por zona) y envía el mensaje en lenguaje natural al canal configurado en <code>caso_tecnico/.env</code>.
+      Requiere <code>TELEGRAM_BOT_TOKEN</code> y <code>TELEGRAM_CHAT_ID</code>.
+    </p>
+    <form method="post" action="{% url 'telegram_force_alert' %}" class="d-flex flex-wrap gap-2 align-items-center">
+      {% csrf_token %}
+      <button type="submit" name="mode" value="demo" class="btn btn-danger">
+        Forzar envío (demo Santiago)
+      </button>
+      <button type="submit" name="mode" value="live" class="btn btn-outline-light">
+        Forzar envío (clima en vivo)
+      </button>
+    </form>
+    <p class="small mt-2 mb-0" style="color:#8b9bb4;">
+      <strong>Demo:</strong> siempre genera alerta simulada en Santiago y la envía.<br>
+      <strong>En vivo:</strong> usa Open-Meteo real; si ninguna zona supera umbral, no hay mensaje de alerta (solo consola).
+    </p>
+  </div>
+</div>
+
+<div class="d-flex flex-wrap gap-2">
+  <a class="btn btn-primary" href="{% url 'monitor' %}">Monitor M3</a>
+  <a class="btn btn-primary" href="{% url 'pipeline' %}">Ver pipeline</a>
+  <a class="btn btn-outline-light" href="{% url 'datos' %}">Tablas y gráficos</a>
+  <a class="btn btn-outline-light" href="{% url 'calibracion' %}">Parámetros por zona</a>
+  <a class="btn btn-outline-light" href="{% url 'figuras' %}">Galería M1</a>
+  <a class="btn btn-outline-secondary" href="{% url 'api_resumen' %}">api/resumen.json</a>
+</div>
+{% endblock %}

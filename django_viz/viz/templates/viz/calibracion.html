@@ -1,0 +1,47 @@
+{% extends "viz/base.html" %}
+{% block title %}Calibración{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">calibration.json (Módulo 2)</h1>
+<p class="text-muted">Parámetros por zona generados desde el histórico (M1). Archivo: <code>{{ path }}</code></p>
+
+{% if error %}
+<div class="alert alert-warning">{{ error }}</div>
+{% elif calibration %}
+
+{% if calibration.global %}
+<div class="card mb-4">
+  <div class="card-header">Global</div>
+  <div class="card-body">
+    <ul class="list-unstyled small mb-0">
+      {% for k, v in calibration.global.items %}
+      <li><strong>{{ k }}:</strong> {{ v }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for zone_name, params in calibration.zones.items %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header">{{ zone_name }}</div>
+      <div class="card-body small">
+        <ul class="list-unstyled mb-0">
+          {% for k, v in params.items %}
+          <li><strong>{{ k }}:</strong> {{ v }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<details class="mt-4">
+  <summary class="text-muted" style="cursor:pointer">JSON completo</summary>
+  <pre class="json mt-2">{{ calibration_json }}</pre>
+</details>
+
+{% endif %}
+{% endblock %}

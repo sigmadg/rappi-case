@@ -1,0 +1,108 @@
+{
+  "name": "Caso Rappi — pipeline unificado (M2+M3 vía /tick)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Un solo flujo operativo\n\n**Puente siempre encendido** (otra terminal, raíz del repo):\n```\n./scripts/run_n8n_bridge.sh\n```\nSi n8n está **en Docker (Linux)** y ves *refused connection*:\n- URL del nodo: `http://host.docker.internal:8090/tick` (no `127.0.0.1`).\n- Arranca el puente: `N8N_BRIDGE_HOST=0.0.0.0 ./scripts/run_n8n_bridge.sh`\n\n**Solo n8n en el mismo PC (npm):** URL `http://127.0.0.1:8090/tick` y el script por defecto vale.\n\n**Open-Meteo** va dentro de Python (`run_operational_tick`). **Alternativa sin API:** *Execute Command* → `scripts/n8n_run_tick.sh` (ver `n8n/README.md`).",
+        "height": 420,
+        "width": 460,
+        "color": 4
+      },
+      "id": "sticky-instrucciones",
+      "name": "Instrucciones",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-80, 160]
+    },
+    {
+      "parameters": {},
+      "id": "manual-unificado",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [440, 320]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "schedule-unificado",
+      "name": "Cada 10 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [440, 520]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8090/tick",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "dry_run",
+              "value": "true"
+            },
+            {
+              "name": "demo",
+              "value": "false"
+            },
+            {
+              "name": "force_send",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "http-tick-unificado",
+      "name": "POST /tick (pipeline Python)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 420]
+    }
+  ],
+  "connections": {
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "POST /tick (pipeline Python)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cada 10 minutos": {
+      "main": [
+        [
+          {
+            "node": "POST /tick (pipeline Python)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "active": false
+}

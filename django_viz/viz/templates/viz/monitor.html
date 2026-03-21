@@ -1,0 +1,175 @@
+{% extends "viz/base.html" %}
+{% block title %}Monitor{% endblock %}
+{% block content %}
+<h1 class="h3 mb-2">Monitor continuo (M3)</h1>
+<p class="text-muted mb-4">
+  Muestra los ciclos que escribe <code>monitor_loop.py</code> (Open-Meteo → motor M2 → debounce → Telegram).
+  El servidor web <strong>no ejecuta</strong> el monitor: hay que dejarlo corriendo en terminal, systemd, etc.
+  Datos en <code>{{ m2_dir }}</code> (<code>.monitor_ticks.jsonl</code>, <code>.monitor_status.json</code>).
+</p>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Último ciclo</span>
+        <span class="badge bg-secondary" id="live-badge" title="Auto-actualización">cada 15s</span>
+      </div>
+      <div class="card-body" id="last-tick-panel">
+        {% if monitor_last %}
+        <dl class="row small mb-0">
+          <dt class="col-sm-4">Hora (UTC)</dt>
+          <dd class="col-sm-8"><code id="fld-ts">{{ monitor_last.ts|default:monitor_updated_at }}</code></dd>
+          <dt class="col-sm-4">Estado</dt>
+          <dd class="col-sm-8"><span class="badge bg-dark border border-secondary" id="fld-status">{{ monitor_last.status }}</span></dd>
+          {% if monitor_last.zone %}
+          <dt class="col-sm-4">Zona</dt>
+          <dd class="col-sm-8" id="fld-zone">{{ monitor_last.zone }}</dd>
+          {% endif %}
+          {% if monitor_last.risk %}
+          <dt class="col-sm-4">Riesgo</dt>
+          <dd class="col-sm-8" id="fld-risk">{{ monitor_last.risk }}</dd>
+          {% endif %}
+          {% if monitor_last.reason %}
+          <dt class="col-sm-4">Motivo</dt>
+          <dd class="col-sm-8 text-break" id="fld-reason">{{ monitor_last.reason }}</dd>
+          {% endif %}
+          <dt class="col-sm-4">Flags</dt>
+          <dd class="col-sm-8" id="fld-flags">
+            demo={{ monitor_last.demo|yesno:"sí,no" }} · dry_run={{ monitor_last.dry_run|yesno:"sí,no" }} · force={{ monitor_last.force_send|yesno:"sí,no" }}
+          </dd>
+        </dl>
+        {% if monitor_last.log_line %}
+        <pre class="json mt-3 mb-0 small" id="fld-log">{{ monitor_last.log_line }}</pre>
+        {% endif %}
+        {% else %}
+        <p class="text-warning mb-0" id="empty-last">Aún no hay ciclos registrados. Ejecuta por ejemplo:</p>
+        <pre class="json mt-2 mb-0 small">python modulo3_agente_telegram/monitor_loop.py --once --demo --dry-run</pre>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">Últimas alertas enviadas (Telegram)</div>
+      <div class="card-body p-0">
+        {% if alert_events %}
+        <div class="table-responsive">
+          <table class="table table-sm table-striped table-dark align-middle mb-0">
+            <thead><tr><th>ts</th><th>zona</th><th>riesgo</th><th>mm/h</th></tr></thead>
+            <tbody id="alerts-tbody">
+              {% for e in alert_events %}
+              <tr>
+                <td class="text-nowrap small">{{ e.ts|truncatechars:22 }}</td>
+                <td>{{ e.zone }}</td>
+                <td>{{ e.risk }}</td>
+                <td class="small">{{ e.forecast_precip_mm_hr }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="p-3 text-muted small mb-0" id="alerts-empty">Sin entradas en <code>.alert_events.jsonl</code> (solo se escribe al enviar de verdad, sin dry-run).</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Historial de ciclos (reciente primero)</div>
+  <div class="card-body p-0">
+    {% if monitor_ticks %}
+    <div class="table-responsive">
+      <table class="table table-sm table-striped table-dark align-middle mb-0">
+        <thead>
+          <tr>
+            <th>ts</th>
+            <th>estado</th>
+            <th>zona</th>
+            <th>riesgo</th>
+            <th>demo / dry</th>
+            <th>línea</th>
+          </tr>
+        </thead>
+        <tbody id="ticks-tbody">
+          {% for t in monitor_ticks %}
+          <tr>
+            <td class="text-nowrap small">{{ t.ts|truncatechars:24 }}</td>
+            <td>{{ t.status }}</td>
+            <td>{{ t.zone|default:"—" }}</td>
+            <td>{{ t.risk|default:"—" }}</td>
+            <td class="small">{{ t.demo|yesno:"d,·" }}/{{ t.dry_run|yesno:"dr,·" }}</td>
+            <td class="small text-break">{{ t.log_line|default:"—"|truncatechars:80 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="p-3 text-muted mb-0" id="ticks-empty">Sin archivo de ticks o está vacío.</p>
+    {% endif %}
+  </div>
+</div>
+
+<p class="small text-muted mb-0">
+  API JSON: <a href="{% url 'api_monitor' %}">api/monitor.json</a> (misma información para integraciones).
+</p>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const url = "{% url 'api_monitor' %}";
+  function esc(s) {
+    if (s == null || s === '') return '—';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+  }
+  function rowTick(t) {
+    const demo = t.demo ? 'd' : '·';
+    const dr = t.dry_run ? 'dr' : '·';
+    const line = (t.log_line || '—').slice(0, 80);
+    return '<tr><td class="text-nowrap small">' + esc((t.ts || '').slice(0, 24)) + '</td><td>' + esc(t.status) + '</td><td>' + esc(t.zone) + '</td><td>' + esc(t.risk) + '</td><td class="small">' + demo + '/' + dr + '</td><td class="small text-break">' + esc(line) + '</td></tr>';
+  }
+  function rowAlert(e) {
+    const ts = (e.ts || '').slice(0, 22);
+    return '<tr><td class="text-nowrap small">' + esc(ts) + '</td><td>' + esc(e.zone) + '</td><td>' + esc(e.risk) + '</td><td class="small">' + esc(e.forecast_precip_mm_hr) + '</td></tr>';
+  }
+  async function refresh() {
+    try {
+      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!j.ok) return;
+      const last = j.monitor_last;
+      const panel = document.getElementById('last-tick-panel');
+      if (last && panel) {
+        let html = '<dl class="row small mb-0">';
+        html += '<dt class="col-sm-4">Hora (UTC)</dt><dd class="col-sm-8"><code>' + esc(last.ts || j.monitor_updated_at) + '</code></dd>';
+        html += '<dt class="col-sm-4">Estado</dt><dd class="col-sm-8"><span class="badge bg-dark border border-secondary">' + esc(last.status) + '</span></dd>';
+        if (last.zone) html += '<dt class="col-sm-4">Zona</dt><dd class="col-sm-8">' + esc(last.zone) + '</dd>';
+        if (last.risk) html += '<dt class="col-sm-4">Riesgo</dt><dd class="col-sm-8">' + esc(last.risk) + '</dd>';
+        if (last.reason) html += '<dt class="col-sm-4">Motivo</dt><dd class="col-sm-8 text-break">' + esc(last.reason) + '</dd>';
+        html += '<dt class="col-sm-4">Flags</dt><dd class="col-sm-8">demo=' + (last.demo ? 'sí' : 'no') + ' · dry_run=' + (last.dry_run ? 'sí' : 'no') + ' · force=' + (last.force_send ? 'sí' : 'no') + '</dd></dl>';
+        if (last.log_line) html += '<pre class="json mt-3 mb-0 small">' + esc(last.log_line) + '</pre>';
+        panel.innerHTML = html;
+      }
+      const tb = document.getElementById('ticks-tbody');
+      if (tb && j.monitor_ticks && j.monitor_ticks.length) {
+        tb.innerHTML = j.monitor_ticks.map(rowTick).join('');
+      }
+      const ab = document.getElementById('alerts-tbody');
+      if (ab && j.alert_events && j.alert_events.length) {
+        ab.innerHTML = j.alert_events.map(rowAlert).join('');
+      }
+      const badge = document.getElementById('live-badge');
+      if (badge) badge.className = 'badge bg-success';
+    } catch (_) {}
+  }
+  setInterval(refresh, 15000);
+})();
+</script>
+{% endblock %}

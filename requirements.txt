@@ -1,0 +1,26 @@
+# Caso Rappi — reproducibilidad (Python 3.11+)
+django>=4.2
+pandas>=2.0
+openpyxl>=3.1
+numpy>=1.26
+matplotlib>=3.8
+matplotlib-inline>=0.1
+seaborn>=0.13
+scipy>=1.11
+scikit-learn>=1.4
+statsmodels>=0.14
+shapely>=2.0
+requests>=2.31
+python-dotenv>=1.0
+jupyter>=1.0
+ipykernel>=6.29
+nbformat>=5.10
+python-telegram-bot>=21.0
+
+# Módulo 3 — LLM (RAG-lite JSON) + orquestación LangChain (ruta OpenAI)
+openai>=1.0
+langchain-core>=0.2
+langchain-openai>=0.1
+
+# Opcional: GeoPandas (polígonos como GDF)
+# geopandas>=0.14

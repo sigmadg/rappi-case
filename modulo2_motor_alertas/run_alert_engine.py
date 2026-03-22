@@ -8,7 +8,8 @@ Uso:
   python run_alert_engine.py --recalibrate   # primero RAW_DATA → calibration.json, luego motor
   python run_alert_engine.py --demo   # simula lluvia fuerte en Santiago (sin red)
 
-Debounce: no repite la misma severidad dentro del TTL; sí permite escalada MEDIO→CRITICO.
+Debounce: deduplicación por zona + evento (riesgo y precipitación); escalada MEDIO→CRITICO;
+opcional ALERT_GLOBAL_MIN_INTERVAL_SEC (mínimo entre alertas en cualquier zona).
 Estado: .alert_state.json
 
 Orden de ``run()``:
@@ -152,11 +153,14 @@ def run(*, demo: bool = False, verbose: bool = False, recalibrate: bool = False)
         print("No se pudo construir decisión.")
         return 1
 
+    thr_ctx = float(decision.expert_context.get("threshold_precip_mm_hr", 0))
     emit, reason = should_emit_alert(
         decision.zone,
         decision.risk,
         STATE_PATH,
         ttl_sec=debounce_ttl_sec_from_env(),
+        precip_mm_max=mx,
+        threshold_mm=thr_ctx,
     )
     if not emit:
         print(f"(Debounce) Omitido: {reason}", file=sys.stderr)

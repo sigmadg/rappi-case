@@ -2,7 +2,9 @@
 Motor tipo sistema experto: reglas IF-THEN calibradas con el Módulo 1.
 
 - Umbrales por zona (`alert_precip_mm_hr`, `precip_coef`, `sensitivity_index`).
-- Multiplicador de incentivo: función del tier de riesgo, sensibilidad y exceso de precip.
+- Objetivo de earnings en MXN: interpolación histórica entre `base_earnings_mxn` (mediana)
+  y `recommended_earnings_mxn` (panel condicionado a lluvia ≥ umbral), según ratio
+  proyectado entre healthy_max y saturación, con tope relativo global.
 - Proyección lineal local del ratio (validada en notebook).
 """
 
@@ -75,6 +77,51 @@ def _incentive_pct(
     return float(min(cap, tier_boost + sens_part + excess_part))
 
 
+def earnings_mx_from_m1_projection(
+    projected_ratio: float,
+    base_mxn: float,
+    recommended_mxn: float,
+    healthy_max: float,
+    saturation: float,
+    risk_rank: int,
+    incentive_cap_pct: float,
+) -> Tuple[float, Dict[str, Any]]:
+    """
+    Traduce el ratio proyectado (coeficiente M1 + precip) en un **MXN objetivo** anclado al
+    panel histórico: ``base_earnings_mxn`` (mediana por zona) y ``recommended_earnings_mxn``
+    (media de EARNINGS cuando precip ≥ umbral de alerta de esa zona, export M1).
+
+    En el tramo saludable→saturación se interpola linealmente; un pequeño refuerzo por tier
+    de riesgo no puede superar ``base * (1 + incentive_cap_pct)``.
+    """
+    base = float(base_mxn)
+    rec = float(recommended_mxn)
+    if rec < base:
+        rec = base * 1.05
+    hi = float(healthy_max)
+    sat = float(saturation)
+    span = max(sat - hi, 1e-6)
+    if projected_ratio <= hi:
+        stress = 0.0
+    elif projected_ratio >= sat:
+        stress = 1.0
+    else:
+        stress = (float(projected_ratio) - hi) / span
+    stress = max(0.0, min(1.0, stress))
+    blended = base + stress * (rec - base)
+    tier_uplift = {1: 0.0, 2: 0.02, 3: 0.045, 4: 0.08}.get(int(risk_rank), 0.0)
+    boosted = blended * (1.0 + tier_uplift)
+    cap_mult = 1.0 + float(incentive_cap_pct)
+    earnings_to = min(boosted, base * cap_mult)
+    earnings_to = max(float(earnings_to), base)
+    meta = {
+        "earnings_blend_stress": round(stress, 4),
+        "earnings_anchor_recommended_mxn": round(rec, 3),
+        "earnings_method": "m1_hist_blend_tier_cap",
+    }
+    return round(earnings_to, 1), meta
+
+
 def decide_for_zone(
     zone: str,
     precip_next_hours: List[float],
@@ -102,6 +149,7 @@ def decide_for_zone(
     thr = float(z["alert_precip_mm_hr"])
     coef = float(z["precip_coef"])
     base = float(z["base_earnings_mxn"])
+    recommended = float(z.get("recommended_earnings_mxn", base * 1.12))
     sens = float(z.get("sensitivity_index", 0.5))
     mm_lin = z.get("mm_precip_healthy_to_saturation_linear")
     cap = float(g.get("incentive_cap_pct", 0.35))
@@ -122,9 +170,12 @@ def decide_for_zone(
     risk_label, risk_rank = classify_risk_expert(
         projected, sat_r, hi, mx, thr
     )
-    # --- (d) Incentivo numérico
-    pct = _incentive_pct(risk_rank, sens, precip_excess, cap)
-    earnings_to = round(base * (1.0 + pct), 1)
+    # --- (d) MXN objetivo desde histórico M1 (mediana → recomendado condicional a lluvia)
+    earnings_to, earn_meta = earnings_mx_from_m1_projection(
+        projected, base, recommended, hi, sat_r, risk_rank, cap
+    )
+    pct_realized = (earnings_to / base) - 1.0 if base > 0 else 0.0
+    pct_heuristic = _incentive_pct(risk_rank, sens, precip_excess, cap)
 
     # --- (e) Zonas secundarias para vigilancia cruzada
     sens_list = sorted(
@@ -142,7 +193,9 @@ def decide_for_zone(
         "risk_rank": risk_rank,
         "sensitivity_index": sens,
         "mm_precip_healthy_to_saturation_linear": mm_lin,
-        "incentive_multiplier_pct": round(100 * pct, 2),
+        "incentive_multiplier_pct": round(100 * pct_realized, 2),
+        "incentive_heuristic_pct": round(100 * pct_heuristic, 2),
+        "recommended_earnings_mxn": round(recommended, 3),
         "earnings_from": round(base, 2),
         "earnings_to": earnings_to,
         "horizon_hours": horizon_hours,
@@ -150,6 +203,7 @@ def decide_for_zone(
         "secondary_zones": secondary,
         "saturation_ratio": sat_r,
         "healthy_ratio_max": hi,
+        **earn_meta,
     }
 
     return AlertDecision(
@@ -161,7 +215,7 @@ def decide_for_zone(
         projected_ratio=round(projected, 2),
         earnings_from=round(base, 1),
         earnings_to=earnings_to,
-        incentive_multiplier_pct=round(100 * pct, 2),
+        incentive_multiplier_pct=round(100 * pct_realized, 2),
         sensitivity_index=sens,
         mm_precip_healthy_to_saturation_linear=float(mm_lin) if mm_lin is not None else None,
         action_minutes=30,

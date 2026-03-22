@@ -3,9 +3,10 @@
 {% block content %}
 <h1 class="h3 mb-2">Monitor continuo (M3)</h1>
 <p class="text-muted mb-4">
-  Muestra los ciclos que escribe <code>monitor_loop.py</code> (Open-Meteo → motor M2 → debounce → Telegram).
-  El servidor web <strong>no ejecuta</strong> el monitor: hay que dejarlo corriendo en terminal, systemd, etc.
-  Datos en <code>{{ m2_dir }}</code> (<code>.monitor_ticks.jsonl</code>, <code>.monitor_status.json</code>).
+  Ciclos de <code>monitor_loop.py</code> (Open-Meteo → motor M2 → debounce → LangChain → Telegram).
+  El servidor <strong>no ejecuta</strong> el monitor; solo lee archivos en <code>{{ m2_dir }}</code>:
+  <code>.monitor_ticks.jsonl</code>, <code>.monitor_status.json</code>, <code>.alert_events.jsonl</code> (envíos),
+  <code>.ops_audit.jsonl</code> (decisiones y debounce).
 </p>
 
 <div class="row g-3 mb-4">
@@ -74,6 +75,40 @@
         {% endif %}
       </div>
     </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Auditoría M2 (<code>.ops_audit.jsonl</code>)</div>
+  <div class="card-body p-0">
+    {% if ops_audit_display %}
+    <div class="table-responsive">
+      <table class="table table-sm table-striped table-dark align-middle mb-0">
+        <thead>
+          <tr>
+            <th>ts</th>
+            <th>evento</th>
+            <th>zona</th>
+            <th>detalle</th>
+          </tr>
+        </thead>
+        <tbody id="audit-tbody">
+          {% for a in ops_audit_display %}
+          <tr>
+            <td class="text-nowrap small">{{ a.ts|truncatechars:26 }}</td>
+            <td><code class="small">{{ a.event }}</code></td>
+            <td>{{ a.zone }}</td>
+            <td class="small text-break" style="max-width: 28rem;">{{ a.detail }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="p-3 text-muted small mb-0" id="audit-empty">
+      Sin entradas recientes o archivo ausente: <code>{{ monitor_paths.audit }}</code>
+    </p>
+    {% endif %}
   </div>
 </div>
 
@@ -164,6 +199,10 @@
       const ab = document.getElementById('alerts-tbody');
       if (ab && j.alert_events && j.alert_events.length) {
         ab.innerHTML = j.alert_events.map(rowAlert).join('');
+      }
+      const aud = document.getElementById('audit-tbody');
+      if (aud && j.ops_audit_display && j.ops_audit_display.length) {
+        aud.innerHTML = j.ops_audit_display.map(rowAudit).join('');
       }
       const badge = document.getElementById('live-badge');
       if (badge) badge.className = 'badge bg-success';

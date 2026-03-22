@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -22,6 +23,7 @@ from .paths import (
     modulo2_dir,
     monitor_status_json,
     monitor_ticks_jsonl,
+    ops_audit_jsonl,
     project_root,
 )
 
@@ -105,7 +107,24 @@ def home(request: HttpRequest) -> HttpResponse:
     n_zones = int(raw["ZONE"].nunique()) if raw is not None and "ZONE" in raw.columns else None
     cal_path = calibration_json()
     cal_ok = cal_path.is_file()
+    cal_mtime_label: str | None = None
+    n_cal_zones: int | None = None
+    if cal_ok:
+        try:
+            cal_mtime_label = datetime.fromtimestamp(cal_path.stat().st_mtime).strftime(
+                "%Y-%m-%d %H:%M (local)"
+            )
+        except OSError:
+            pass
+        try:
+            cal_data = json.loads(cal_path.read_text(encoding="utf-8"))
+            z = cal_data.get("zones")
+            if isinstance(z, dict):
+                n_cal_zones = len(z)
+        except (json.JSONDecodeError, OSError):
+            pass
     n_figs = len([p for p in figures_dir().glob("*") if p.suffix.lower() in (".png", ".svg", ".jpg", ".jpeg")])
+    audit_p = ops_audit_jsonl()
     return render(
         request,
         "viz/home.html",
@@ -115,7 +134,10 @@ def home(request: HttpRequest) -> HttpResponse:
             "n_zones": n_zones,
             "data_error": err,
             "calibration_ok": cal_ok,
+            "calibration_mtime": cal_mtime_label,
+            "n_cal_zones": n_cal_zones,
             "n_figures": n_figs,
+            "has_audit_log": audit_p.is_file(),
             "project_root": str(project_root()),
         },
     )
@@ -283,6 +305,37 @@ def _read_json_dict(path: Path) -> Dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def _ops_audit_rows_for_template(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filas listas para tabla HTML (ts, event, zona, detalle)."""
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        ts = row.get("ts")
+        z = row.get("zone") or row.get("primary_zone") or ""
+        out.append(
+            {
+                "ts": (str(ts)[:28] if ts is not None else ""),
+                "event": str(row.get("event", "")),
+                "zone": str(z) if z else "—",
+                "detail": _audit_detail_short(row),
+            }
+        )
+    return out
+
+
+def _audit_detail_short(row: Dict[str, Any], max_len: int = 140) -> str:
+    """Texto compacto para tabla (excluye ts/event ya mostrados en otras columnas)."""
+    skip = {"ts", "event"}
+    extra = {k: v for k, v in row.items() if k not in skip and v is not None}
+    if not extra:
+        return "—"
+    s = json.dumps(extra, ensure_ascii=False, default=str)
+    if len(s) <= max_len:
+        return s
+    return s[: max_len - 1] + "…"
+
+
 def _read_jsonl_tail(path: Path, n: int) -> List[Dict[str, Any]]:
     """Últimas n líneas válidas, más reciente primero."""
     if not path.is_file() or n <= 0:
@@ -309,21 +362,27 @@ def _monitor_context() -> Dict[str, Any]:
     st = monitor_status_json()
     ticks_p = monitor_ticks_jsonl()
     alerts_p = alert_events_jsonl()
+    audit_p = ops_audit_jsonl()
     last = _read_json_dict(st)
     tick_rows = _read_jsonl_tail(ticks_p, 100)
     # Alertas: mismas columnas útiles para tabla
     alert_rows = _read_jsonl_tail(alerts_p, 50)
+    audit_rows = _read_jsonl_tail(audit_p, 40)
     return {
         "monitor_last": last.get("last") if last else None,
         "monitor_updated_at": (last or {}).get("updated_at"),
         "monitor_ticks": tick_rows,
         "alert_events": alert_rows,
+        "ops_audit": audit_rows,
+        "ops_audit_display": _ops_audit_rows_for_template(audit_rows),
         "monitor_paths": {
             "status": str(st),
             "ticks": str(ticks_p),
             "alerts": str(alerts_p),
+            "audit": str(audit_p),
         },
         "has_tick_log": ticks_p.is_file(),
+        "has_audit_log": audit_p.is_file(),
         "m2_dir": str(modulo2_dir()),
     }
 

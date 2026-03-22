@@ -1,0 +1,23 @@
+# Caso técnico: un servicio = Dockerfile raíz (Django + monitor + puente /tick).
+# Uso: docker compose up --build
+# Si 8000/8090 del host están ocupados:
+#   CASO_HOST_HTTP=8001 CASO_HOST_BRIDGE=8091 docker compose up --build
+# Requisitos: data/rappi_delivery_case_data.xlsx
+# Opcional: cp .env.example .env y descomenta la línea .env abajo (Telegram / OpenAI).
+
+services:
+  caso-tecnico:
+    build: .
+    image: caso-tecnico:latest
+    ports:
+      - "${CASO_HOST_HTTP:-8000}:8000"
+      - "${CASO_HOST_BRIDGE:-8090}:8090"
+    volumes:
+      - ./data:/app/data:ro
+      # Carga credenciales (Telegram, etc.): sin esto el monitor no puede enviar a Telegram.
+      - ./.env:/app/.env:ro
+    # MONITOR_*: el entrypoint bash no hace source de /app/.env; Compose inyecta desde el .env del host.
+    environment:
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}
+      MONITOR_DRY_RUN: ${MONITOR_DRY_RUN:-1}
+      MONITOR_INTERVAL_SEC: ${MONITOR_INTERVAL_SEC:-600}

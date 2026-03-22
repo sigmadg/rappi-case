@@ -2,16 +2,16 @@
 {% block title %}Inicio{% endblock %}
 {% block content %}
 <h1 class="h3 mb-4">Panel de visualización</h1>
-<p class="text-muted mb-4">Explora el dataset del <strong>Módulo 1</strong>, la calibración del <strong>Módulo 2</strong> y el flujo hacia el agente <strong>Módulo 3</strong> (Telegram).</p>
+<p class="text-muted mb-4">Explora el dataset del <strong>Módulo 1</strong> (diagnóstico y figuras), la calibración y auditoría del <strong>Módulo 2</strong>, y el monitor / Telegram del <strong>Módulo 3</strong> (LangChain + <code>python-telegram-bot</code>).</p>
 
 <div class="row g-3 mb-4">
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted">RAW_DATA</h2>
+        <h2 class="h6 text-uppercase text-muted">M1 · RAW_DATA</h2>
         {% if n_rows %}
         <p class="display-6 mb-0">{{ n_rows|floatformat:0 }}</p>
-        <small class="text-muted">filas · {{ n_zones }} zonas</small>
+        <small class="text-muted">filas · {{ n_zones }} zonas (Excel <code>data/rappi_delivery_case_data.xlsx</code>)</small>
         {% else %}
         <p class="text-warning mb-0">Sin datos</p>
         <small class="text-muted">{{ data_error }}</small>
@@ -22,11 +22,14 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted">calibration.json</h2>
+        <h2 class="h6 text-uppercase text-muted">M2 · calibration.json</h2>
         {% if calibration_ok %}
-        <p class="mb-0"><span class="badge bg-success">Disponible</span></p>
+        <p class="mb-1"><span class="badge bg-success">Disponible</span></p>
+        {% if n_cal_zones %}<small class="text-muted d-block">{{ n_cal_zones }} zonas calibradas</small>{% endif %}
+        {% if calibration_mtime %}<small class="text-muted d-block">última modificación: {{ calibration_mtime }}</small>{% endif %}
         {% else %}
         <p class="mb-0"><span class="badge bg-secondary">No encontrado</span></p>
+        <small class="text-muted">Genera con <code>export_calibration_from_m1.py</code> o el notebook M1.</small>
         {% endif %}
       </div>
     </div>
@@ -34,9 +37,32 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted">Figuras notebook</h2>
+        <h2 class="h6 text-uppercase text-muted">M1 · Figuras</h2>
         <p class="display-6 mb-0">{{ n_figures }}</p>
-        <small class="text-muted">imágenes en <code>modulo1_diagnostico/figures</code></small>
+        <small class="text-muted"><code>modulo1_diagnostico/figures</code> (salida del notebook)</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card h-100 border-secondary">
+      <div class="card-body py-3">
+        <h2 class="h6 text-uppercase text-muted mb-2">M2 · Auditoría operativa</h2>
+        {% if has_audit_log %}
+        <p class="mb-0"><span class="badge bg-info text-dark">.ops_audit.jsonl</span> <span class="small text-muted">decisiones del motor, debounce, fallos de clima</span></p>
+        {% else %}
+        <p class="mb-0 small text-muted">Aún no hay <code>.ops_audit.jsonl</code>. Aparece al ejecutar <code>run_alert_engine.py</code> o el pipeline M3.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100 border-secondary">
+      <div class="card-body py-3">
+        <h2 class="h6 text-uppercase text-muted mb-2">M3 · Monitor</h2>
+        <p class="mb-0 small" style="color:#c5d0e0;">Ticks en <code>modulo2_motor_alertas/.monitor_ticks.jsonl</code> · estado en <code>.monitor_status.json</code>. Ver <a href="{% url 'monitor' %}">Monitor</a>.</p>
       </div>
     </div>
   </div>
@@ -53,7 +79,7 @@
   <div class="card-header" style="background: rgba(255,48,8,0.12);">Módulo 3 — Enviar a Telegram (forzar)</div>
   <div class="card-body">
     <p class="small mb-3" style="color:#c5d0e0;">
-      Ejecuta <code>run_agent.py --force-send</code>: <strong>ignora el debounce</strong> (TTL por zona) y envía el mensaje en lenguaje natural al canal configurado en <code>caso_tecnico/.env</code>.
+      Ejecuta <code>run_agent.py --force-send</code>: <strong>ignora debounce</strong> (huella de evento + intervalo global / TTL por zona) y envía el mensaje en lenguaje natural al canal en <code>caso_tecnico/.env</code>.
       Requiere <code>TELEGRAM_BOT_TOKEN</code> y <code>TELEGRAM_CHAT_ID</code>.
     </p>
     <form method="post" action="{% url 'telegram_force_alert' %}" class="d-flex flex-wrap gap-2 align-items-center">

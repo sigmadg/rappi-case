@@ -35,6 +35,25 @@ sys.path.insert(0, str(M2 / "src"))
 
 load_dotenv(ROOT.parent / ".env")
 
+
+def _require_telegram_if_monitor_ping() -> None:
+    """Si TELEGRAM_MONITOR_PING=1 hace falta python-telegram-bot en este intérprete."""
+    raw = (os.environ.get("TELEGRAM_MONITOR_PING") or "0").strip().lower()
+    if raw not in ("1", "true", "yes", "on"):
+        return
+    try:
+        import telegram  # noqa: F401
+    except ImportError:
+        print(
+            "[monitor] ERROR: TELEGRAM_MONITOR_PING=1 pero falta el paquete 'python-telegram-bot' "
+            "en este Python. Activa el venv del repo (source .venv/bin/activate) o ejecuta:\n"
+            f"  {ROOT.parent / '.venv' / 'bin' / 'python'} {ROOT / 'monitor_loop.py'} ...",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise SystemExit(2)
+
+
 from langchain_monitor import build_monitor_chain, default_interval_sec  # noqa: E402
 from monitor_tick_log import record_monitor_error  # noqa: E402
 
@@ -65,8 +84,9 @@ def main() -> None:
         help="Ejecuta un solo ciclo y termina",
     )
     args = ap.parse_args()
+    _require_telegram_if_monitor_ping()
 
-    # Intervalo efectivo: flag CLI > MONITOR_INTERVAL_SEC > default 600 (mín. 60 en langchain_monitor).
+    # Intervalo efectivo: flag CLI > MONITOR_INTERVAL_SEC > default 600 (mín. 15 s en langchain_monitor).
     interval = args.interval_sec if args.interval_sec is not None else default_interval_sec()
 
     # Estado fijo que recibe cada ``chain.invoke`` (demo/dry-run/force/debounce-telegram).

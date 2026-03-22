@@ -3,16 +3,16 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Un solo flujo operativo\n\n**Puente siempre encendido** (otra terminal, raíz del repo):\n```\n./scripts/run_n8n_bridge.sh\n```\nSi n8n está **en Docker (Linux)** y ves *refused connection*:\n- URL del nodo: `http://host.docker.internal:8090/tick` (no `127.0.0.1`).\n- Arranca el puente: `N8N_BRIDGE_HOST=0.0.0.0 ./scripts/run_n8n_bridge.sh`\n\n**Solo n8n en el mismo PC (npm):** URL `http://127.0.0.1:8090/tick` y el script por defecto vale.\n\n**Open-Meteo** va dentro de Python (`run_operational_tick`). **Alternativa sin API:** *Execute Command* → `scripts/n8n_run_tick.sh` (ver `n8n/README.md`).",
-        "height": 420,
-        "width": 460,
+        "content": "## Pipeline M2+M3 (`POST /tick`)\n\nMisma pasada operativa que `monitor_loop.py --once`: Open-Meteo → motor M2 → debounce → M3 / Telegram.\n\n### Puente HTTP\n- **Manual (dev):** desde la raíz del repo: `./scripts/run_n8n_bridge.sh`\n- **Contenedor único del repo:** `docker compose up --build` (imagen raíz) ya levanta el puente en **8090** → en el host: `http://127.0.0.1:8090/tick`\n\n### URL en el nodo HTTP\n- n8n y el puente en el **mismo host:** `127.0.0.1:8090` (por defecto abajo).\n- **n8n dentro de Docker** (UI en contenedor): usa `http://host.docker.internal:8090/tick` y arranca el puente con `N8N_BRIDGE_HOST=0.0.0.0` si hace falta (Linux). Ver `n8n/README.md`.\n\nOpcional: define en el entorno de n8n **`CASO_TICK_URL`** (URL completa, incl. `/tick`) para sobrescribir la del nodo.\n\n### Query (`dry_run`, `demo`, `force_send`)\n| Parámetro | Valor en este workflow | Notas |\n|-----------|------------------------|--------|\n| `dry_run` | `true` | No envía alerta larga a Telegram. Para envío real: `false` y `.env` con `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`. |\n| `demo` | `false` | `true` = serie demo Santiago (sin Open-Meteo real en esa zona). |\n| `force_send` | `false` | `true` ignora debounce (solo pruebas). |\n\n`TELEGRAM_MONITOR_PING`, `MONITOR_INTERVAL_SEC`, etc. **no** son query: van en `caso_tecnico/.env` (Python los lee al ejecutar `/tick`).\n\n### Schedule\n**Cada 10 min** es orientativo; alinéalo con tu `MONITOR_INTERVAL_SEC` si comparas con `monitor_loop.py` nativo.",
+        "height": 560,
+        "width": 520,
         "color": 4
       },
       "id": "sticky-instrucciones",
       "name": "Instrucciones",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-80, 160]
+      "position": [-120, 120]
     },
     {
       "parameters": {},
@@ -42,7 +42,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:8090/tick",
+        "url": "={{ $env.CASO_TICK_URL || 'http://127.0.0.1:8090/tick' }}",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [

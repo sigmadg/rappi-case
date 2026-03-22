@@ -35,3 +35,8 @@ def monitor_ticks_jsonl() -> Path:
 
 def alert_events_jsonl() -> Path:
     return modulo2_dir() / ".alert_events.jsonl"
+
+
+def ops_audit_jsonl() -> Path:
+    """Eventos granulares del motor / pipeline (debounce, decisiones, fallos clima)."""
+    return modulo2_dir() / ".ops_audit.jsonl"

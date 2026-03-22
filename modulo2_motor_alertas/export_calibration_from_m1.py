@@ -6,7 +6,8 @@ Regenera `calibration.json` a partir del mismo panel y lógica que el notebook
 Reglas (documentadas también en README):
 - ratio = ORDERS / CONNECTED_RT (CONNECTED_RT=0 → NaN)
 - clasificación: saturacion si ratio > 1.8, etc. (igual que notebook)
-- precip_coef: MCO por zona  ratio ~ PRECIPITATION_MM + C(HOUR)
+- precip_coef: MCO por zona  ratio ~ PRECIPITATION_MM + C(HOUR) + C(dow)
+  (dow = día de la semana desde DATE, 0=lun…6=dom; alineado a P2/GAP1 del notebook M1)
 - mm_precip_healthy_to_saturation_linear: 0.6 / precip_coef si coef > 0
   (paso lineal 1.2 → 1.8 en ratio, Δ=0.6, como en el texto de P3 del notebook)
 - sensitivity_index: |precip_coef| normalizado al máximo |coef| entre zonas
@@ -15,7 +16,8 @@ Reglas (documentadas también en README):
   si p75 < 0.5 mm/h (saturación mayormente en horas secas en el panel),
   se usa 6.55 mm/h (valor de referencia del caso empaquetado para MTY_Guadalupe y San Nicolás)
 - recommended_earnings_mxn: media de EARNINGS con PRECIPITATION_MM >= umbral de alerta
-  (≥3 obs.); si no, 1.15 × mediana de EARNINGS. No la usa `decide_for_zone`; es referencia.
+  (≥3 obs.); si no, 1.15 × mediana de EARNINGS. `decide_for_zone` la usa con base_earnings_mxn
+  para el objetivo MXN (interpolación según ratio proyectado).
 
 Uso (venv activado):
   Desde la raíz del repo:  python modulo2_motor_alertas/export_calibration_from_m1.py
@@ -61,14 +63,15 @@ def load_raw(excel_path: Path) -> pd.DataFrame:
     raw = pd.read_excel(excel_path, sheet_name="RAW_DATA")
     raw["ratio"] = raw["ORDERS"] / raw["CONNECTED_RT"].replace(0, np.nan)
     raw["clasificacion"] = raw["ratio"].apply(clasificar)
+    raw["dow"] = pd.to_datetime(raw["DATE"], errors="coerce").dt.dayofweek
     return raw
 
 
 def precip_coef_zone(raw: pd.DataFrame, zone: str) -> float:
-    sub = raw[raw["ZONE"] == zone].dropna(subset=["ratio", "PRECIPITATION_MM", "HOUR"])
-    if len(sub) < 24:
-        raise ValueError(f"Zona {zone!r}: pocas filas válidas para regresión ({len(sub)})")
-    model = smf.ols("ratio ~ PRECIPITATION_MM + C(HOUR)", data=sub).fit()
+    sub = raw[raw["ZONE"] == zone].dropna(subset=["ratio", "PRECIPITATION_MM", "HOUR", "dow"])
+    if len(sub) < 48:
+        raise ValueError(f"Zona {zone!r}: pocas filas válidas para regresión ({len(sub)}; mín. 48 con HOUR+dow)")
+    model = smf.ols("ratio ~ PRECIPITATION_MM + C(HOUR) + C(dow)", data=sub).fit()
     return float(model.params["PRECIPITATION_MM"])
 
 

@@ -31,6 +31,7 @@ from zones import default_data_path, load_centroids
 
 from alert_event_log import append_alert_event
 from debounce import debounce_ttl_sec_from_env, should_emit_alert
+from monitor_ping import maybe_send_monitor_status_ping
 
 setup_ops_logging()
 _LOG = get_ops_logger("pipeline")
@@ -47,8 +48,14 @@ HIST_NOTE = (
 )
 
 
-def _audit_tick_end(out: Dict[str, Any]) -> Dict[str, Any]:
-    """Una línea JSONL + log INFO: qué pasó en esta pasada (sin texto largo de Telegram)."""
+def _audit_tick_end(
+    out: Dict[str, Any],
+    *,
+    dry_run: bool = False,
+    validate: bool = False,
+    telegram_already_sent: bool = False,
+) -> Dict[str, Any]:
+    """Una línea JSONL + log INFO; opcionalmente ping de monitor a Telegram (ver ``monitor_ping``)."""
     slim: Dict[str, Any] = {
         "status": out.get("status"),
         "zone": out.get("zone"),
@@ -65,6 +72,16 @@ def _audit_tick_end(out: Dict[str, Any]) -> Dict[str, Any]:
         slim.get("zone"),
         slim.get("risk"),
     )
+    try:
+        maybe_send_monitor_status_ping(
+            M2,
+            out,
+            dry_run=dry_run,
+            validate=validate,
+            telegram_already_sent=telegram_already_sent,
+        )
+    except Exception:
+        _LOG.debug("monitor ping omitido por error no crítico", exc_info=True)
     return out
 
 
@@ -97,7 +114,11 @@ def run_operational_tick(
 
     data_path = default_data_path()
     if not data_path.exists():
-        return _audit_tick_end({"status": "no_data", "detail": str(data_path)})
+        return _audit_tick_end(
+            {"status": "no_data", "detail": str(data_path)},
+            dry_run=dry_run,
+            validate=validate,
+        )
 
     cal = load_calibration(CAL_PATH)
     centroids = load_centroids(data_path)
@@ -137,7 +158,9 @@ def run_operational_tick(
                 "status": "weather_error",
                 "detail": "Open-Meteo no entregó datos para ninguna zona tras reintentos",
                 "failures": weather_failures,
-            }
+            },
+            dry_run=dry_run,
+            validate=validate,
         )
 
     # --- Fase motor (M2): elegir zona con mayor exceso vs umbral y construir AlertDecision.
@@ -151,7 +174,9 @@ def run_operational_tick(
                 "status": "no_alert",
                 "detail": "ninguna zona supera umbral",
                 "weather_failures": weather_failures or None,
-            }
+            },
+            dry_run=dry_run,
+            validate=validate,
         )
 
     append_audit(M2, "primary_zone_selected", zone=primary)
@@ -159,20 +184,33 @@ def run_operational_tick(
     precip_series = next(s for z, s in zone_precip if z == primary)
     d = decide_for_zone(primary, precip_series, cal, horizon_hours=HORIZON)
     if d is None:
-        return _audit_tick_end({"status": "no_decision", "detail": primary})
+        return _audit_tick_end(
+            {"status": "no_decision", "detail": primary},
+            dry_run=dry_run,
+            validate=validate,
+        )
 
     # --- Fase debounce (TTL + escalada); force_send y validate saltan este bloque.
     ttl = debounce_ttl_sec_from_env()
     if not force_send and not validate:
-        emit, reason = should_emit_alert(d.zone, d.risk, STATE_PATH, ttl_sec=ttl)
+        fc = float(d.expert_context.get("forecast_precip_mm_hr", 0))
+        thr_ctx = float(d.expert_context.get("threshold_precip_mm_hr", 0))
+        emit, reason = should_emit_alert(
+            d.zone,
+            d.risk,
+            STATE_PATH,
+            ttl_sec=ttl,
+            precip_mm_max=fc,
+            threshold_mm=thr_ctx,
+        )
         if not emit:
             ttl_min = max(1, round(ttl / 60))
             debounce_msg = (
                 f"⏸️ (Debounce) {reason}\n"
                 f"Zona: {d.zone}\n"
                 f"Riesgo actual: {d.risk}\n"
-                f"Ventana TTL: ~{ttl_min} min (misma o menor severidad no se reenvía hasta entonces; "
-                f"sí hay escalada MEDIO→CRITICO, etc.)."
+                f"TTL ~{ttl_min} min: no se repite el mismo evento (severidad + lluvia sin empeoramiento "
+                f"material); escalada sí. Cooldown global opcional: ALERT_GLOBAL_MIN_INTERVAL_SEC."
             )
             if not dry_run and send_debounce_telegram:
                 try:
@@ -193,7 +231,10 @@ def run_operational_tick(
                     "zone": d.zone,
                     "risk": d.risk,
                     "debounce_message": debounce_msg,
-                }
+                },
+                dry_run=dry_run,
+                validate=validate,
+                telegram_already_sent=(not dry_run and send_debounce_telegram),
             )
 
     # --- Fase M3: JSON del motor → texto (LLM o plantilla) → Telegram si no es dry_run/validate.
@@ -208,7 +249,9 @@ def run_operational_tick(
                 "used_llm": used_llm,
                 "zone": d.zone,
                 "risk": d.risk,
-            }
+            },
+            dry_run=dry_run,
+            validate=True,
         )
 
     if dry_run:
@@ -227,7 +270,9 @@ def run_operational_tick(
                 "text": final,
                 "zone": d.zone,
                 "risk": d.risk,
-            }
+            },
+            dry_run=True,
+            validate=validate,
         )
 
     send_message(final)
@@ -258,5 +303,8 @@ def run_operational_tick(
             "zone": d.zone,
             "risk": d.risk,
             "used_llm": used_llm,
-        }
+        },
+        dry_run=dry_run,
+        validate=validate,
+        telegram_already_sent=True,
     )

@@ -87,6 +87,7 @@ def run_monitor_cycle(config: Dict[str, Any] | None = None) -> Dict[str, Any]:
 def default_interval_sec() -> int:
     raw = (os.environ.get("MONITOR_INTERVAL_SEC") or "600").strip()
     try:
-        return max(60, int(raw))
+        # Mínimo 15 s (alineado con TELEGRAM_MONITOR_PING_MIN_SEC); máximo 24 h
+        return max(15, min(int(raw), 86400))
     except ValueError:
         return 600

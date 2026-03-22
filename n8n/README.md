@@ -59,6 +59,8 @@ Atajo (mismo efecto que el `uvicorn` de arriba):
 
 Parámetros query: `dry_run=true|false`, `demo=true|false`, `force_send=true|false`.
 
+En el workflow **`rappi_pipeline_unificado.json`**, la URL del nodo HTTP usa por defecto `http://127.0.0.1:8090/tick` o, si existe, la variable de entorno **`CASO_TICK_URL`** (URL completa con `/tick`), útil para Docker n8n sin editar el nodo.
+
 ### «The service refused the connection — perhaps it is offline» (n8n)
 
 Significa **connection refused**: nada acepta TCP en esa IP:puerto, o el firewall rechaza. Revisa en orden:
@@ -113,8 +115,8 @@ chmod +x scripts/n8n_run_tick.sh
 
 ## 5) Alinear con el monitor real
 
-- Intervalo del **Schedule Trigger** en n8n (p. ej. 10 min) ≈ `MONITOR_INTERVAL_SEC` / `monitor_loop.py`.
-- La lógica **LangChain** del repo no se reimplementa en n8n: n8n **dispara** el mismo binario/Python.
+- Intervalo del **Schedule Trigger** en n8n (p. ej. 10 min en `rappi_pipeline_unificado.json`) ≈ `MONITOR_INTERVAL_SEC` de `monitor_loop.py` (solo referencia; n8n y el monitor son disparadores independientes).
+- La lógica **LangChain** del repo no se reimplementa en n8n: n8n **dispara** la misma función Python vía `POST /tick`.
 
 ## Limitaciones
 

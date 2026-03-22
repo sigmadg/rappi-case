@@ -1,84 +1,75 @@
 % Compilar: cd "Diagnóstico Operacional" && pdflatex "Diagnóstico Operacional.tex"
-% Figuras: ../figures/ (generadas con 01_diagnostico_operacional.ipynb)
+% Fuente de cifras: notebooks/01_diagnostico_operacional.ipynb (+ calibration.json donde aplica)
 \documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[spanish]{babel}
-\usepackage{graphicx}
 \usepackage{geometry}
-\usepackage{float}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\geometry{margin=2.0cm}
+\usepackage{enumitem}
+\usepackage{microtype}
 \usepackage{hyperref}
-\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+\hypersetup{colorlinks=true, linkcolor=blue!40!black, urlcolor=blue!40!black}
+\geometry{a4paper,margin=1.45cm}
+\setlength{\parskip}{0.4em}
+\setlength{\parindent}{0pt}
+\setlist[itemize]{nosep,leftmargin=1.2em,itemsep=0.25em,topsep=0.2em}
 
-\title{\textbf{Diagnóstico operacional}\\[0.35em]
-{\large Caso técnico Rappi --- Módulo 1}\\
-{\normalsize Dataset: panel 30 días $\times$ 24 h $\times$ 14 zonas (10\,080 filas)}}
+\title{\textbf{Reporte de diagnóstico operativo: puntos clave e impacto}}
 \author{}
-\date{\today}
+\date{\normalsize\today}
 
 \begin{document}
 \maketitle
+\vspace{-0.5em}
 
-\section*{Resumen de hallazgos (máx.\ 1 página)}
+\section*{Hallazgos en datos}
 
-\noindent\textbf{Patrones.} La \textbf{saturación} (ratio $>1.8$) representa el \textbf{5{,}09\,\%} del panel. Se concentra en franjas \textbf{12--14\,h} (picos de conteo: 14\,h, 13\,h, 12\,h) y en la tarde (\textbf{19--21\,h}). Por zona, el mayor número de observaciones en saturación aparece en \emph{San Nicolás}, \emph{Santiago}, \emph{MTY\_Guadalupe}, \emph{Carretera Nacional} y \emph{Mitras Centro}. La \textbf{precipitación} se asocia al ratio con correlación de Pearson \textbf{0{,}32} con \texttt{ratio}; en un MCO \texttt{ratio $\sim$ PRECIPITATION\_MM + HOUR + ZONE}, el coeficiente marginal es \textbf{+0{,}081} puntos de ratio por mm/h adicional (muy significativo). Condicionando el umbral de lluvia: $\mathbb{P}(\text{saturación}\mid \text{precip} > 0{,}5\,\mathrm{mm/h}) \approx 0{,}31$ frente a $\mathbb{P}(\cdot\mid \text{resto}) \approx 0{,}038$ --- un factor del orden de \textbf{$\times\,8{,}2$} en cociente de probabilidades. La sensibilidad marginal a lluvia \emph{por zona} (control por hora) es mayor en \emph{Santiago}, \emph{Carretera Nacional} y \emph{Santa Catarina}. A nivel día, la fracción de celdas saturadas llega hasta \textbf{16{,}7\,\%} en el peor día; el percentil 75 de esa fracción es \textbf{4{,}7\,\%}. La correlación Spearman global \texttt{EARNINGS}--\texttt{ratio} es débil (\textbf{0{,}08}); con precipitación $>0$ el signo se invierte respecto al agregado, coherente con que \textbf{incentivos y clima interactúan} (modelo con interacción \texttt{EARNINGS $\times$ PRECIPITATION\_MM}).
+\noindent\textbf{Qué medimos con ``ratio''.} En cada hora y zona, el \textbf{ratio} es sencillamente \emph{cuántos pedidos hay por cada repartidor conectado}. Si el número es alto, hay mucha demanda comparada con la gente disponible; el caso marca \textbf{saturación} cuando ese ratio supera \textbf{1{,}8} (muchos pedidos, poca capacidad relativa).
 
-\noindent\textbf{Impacto cuantificado en la operación.} (1)~\textbf{Capacidad y pricing en ventanas críticas:} priorizar monitoreo y refuerzo de oferta en \textbf{12--14\,h} y \textbf{19--21\,h} ataca la mayor densidad observada de saturación. (2)~\textbf{Playbook de lluvia:} ante precipitación $>0{,}5$\,mm/h la probabilidad de celda saturada es \textbf{ocho veces} la de condiciones secas; conviene activar reglas de incentivos / cupos diferenciados por zona con mayor $\beta$ marginal (p.\,ej.\ Santiago y Carretera Nacional). (3)~\textbf{Eficiencia de incentivos:} la relación lineal simple incentivo--ratio es floja; revisar alineación día a día entre \textbf{earn medio} y \textbf{fracción saturada} (dispersión en P4) evita gastar en días de alto incentivo sin reducir estrés proporcionalmente. (4)~\textbf{Orden de magnitud}: el ejercicio de sensibilidad (mm/h necesarios para mover el ratio $\sim$0{,}6 puntos en el tramo saludable$\rightarrow$saturación) ordena zonas por ``fragilidad'' operativa ante lluvia (figura de sensibilidad).
+\begin{itemize}
+  \item \textbf{Cuánto histórico revisamos.} Trabajamos con \textbf{10\,080} registros: \textbf{30 días} seguidos, las \textbf{24 horas} del día, en \textbf{14 zonas} de Monterrey. Es una ``foto'' completa de un mes, no una muestra pequeña.
 
-\vspace{0.6em}
-\noindent\rule{\linewidth}{0.4pt}
+  \item \textbf{Con qué frecuencia vamos ``en rojo''.} En ese mes, el servicio aparece en saturación (según la regla del caso) alrededor del \textbf{5\,\%} del tiempo total observado. No es la mayoría de las horas, pero es suficiente para planear turnos y alertas.
 
-\section*{Alineación geográfica y continuidad con el Módulo 2}
+  \item \textbf{Horas en las que más duele.} La saturación no está repartida al azar: se concentra sobre todo entre la \textbf{comida (12--14\,h)} y la \textbf{cena (19--21\,h)}. Ahí es donde conviene reforzar capacidad y seguimiento.
 
-\noindent El diagnóstico sobre \texttt{RAW\_DATA} debe referirse a las \textbf{mismas zonas operativas} que figuran en \texttt{ZONE\_INFO} (centroides y \texttt{DESCRIPTION}) y en \texttt{ZONE\_POLYGONS} (polígonos en WKT). En el notebook, una celda dedicada importa \texttt{validate\_excel\_zone\_consistency} desde \texttt{modulo2\_motor\_alertas/src/zones.py}: comprueba la coincidencia de nombres entre las tres hojas y cuenta cuántos WKT son parseables. Si un polígono viene \textbf{truncado} en Excel (\,$\sim$\,32\,k caracteres), no se usa para el punto de consulta; el Módulo~2 entonces toma \texttt{LATITUDE\_CENTER} y \texttt{LONGITUDE\_CENTER} de \texttt{ZONE\_INFO} (caso empaquetado: dos zonas). La misma validación se ejecuta al \textbf{recalibrar} (\texttt{export\_calibration\_from\_m1.py}) y al arrancar el motor (\texttt{run\_alert\_engine.py}), con advertencias en consola si hubiera desajustes.
+  \item \textbf{Zonas que más aparecen en saturación.} Por número de episodios en el histórico destacan \textbf{San Nicolás}, \textbf{Santiago}, \textbf{Monterrey--Guadalupe} (en datos: \texttt{MTY\_Guadalupe}), \textbf{Carretera Nacional} y \textbf{Mitras Centro}. No todas las colonias se comportan igual; por eso más adelante hablamos de reglas \emph{por zona}.
 
-\noindent La \textbf{calibración} del motor (coeficientes marginales de precipitación por zona, umbrales de alerta, sensibilidad, earnings base) se estima desde \texttt{RAW\_DATA} con la misma especificación que P3 del notebook (\texttt{ratio $\sim$ PRECIPITATION\_MM + C(HOUR)} por zona) y se escribe en \texttt{calibration.json}. El motor en vivo combina ese JSON con el \textbf{pronóstico horario} (Open-Meteo, mm/h) en coordenadas obtenidas del polígono (\texttt{representative\_point}) o, en respaldo, de los centroides anteriores. Opción \texttt{--recalibrate} en \texttt{run\_alert\_engine.py}: regenera el JSON desde el Excel antes de consultar la API.
+  \item \textbf{Días muy malos.} En el peor día del panel, casi \textbf{uno de cada seis} momentos (celdas) estuvo en saturación: más del \textbf{16\,\%} del día. Un ejemplo es el \textbf{28 de marzo de 2024}. El notebook también lista otras fechas y cruces entre ingresos medios y estrés para revisar si el gasto en incentivos acompañó bien a la presión real.
 
-\section*{Figuras y notas (notebook \texttt{01\_diagnostico\_operacional.ipynb})}
+  \item \textbf{Lluvia y saturación (sin confundir la hora con el clima).} A simple vista, cuando llueve más suele subir el ratio (correlación del orden de \textbf{0{,}32}). Pero para no sacar conclusiones ingenuas, usamos un modelo estadístico (\textbf{MCO}) que separa el efecto de la lluvia del efecto de la \textbf{hora}, la \textbf{zona} y el \textbf{día de la semana}. Con eso seguimos viendo que la lluvia va asociada a más presión operativa; el modelo explica alrededor del \textbf{72\,\%} de la variación del ratio (R$^2$ ajustado $\approx 0{,}72$ en la corrida de referencia).
 
-\noindent Las figuras se generan en el notebook (misma lógica de ratio, clasificación y modelos) y se guardan en \texttt{modulo1\_diagnostico/figures/}. A continuación se incluyen las principales para el informe.
+  \item \textbf{La regla práctica de 0{,}5\,mm/h.} Si en una hora la intensidad de lluvia supera \textbf{0{,}5\,mm/h}, la probabilidad de estar saturado es del orden de \textbf{ocho veces} mayor que cuando la lluvia es igual o menor a ese corte. Por eso tiene sentido activar protocolos con pronósticos de ``llovizna'', no solo con tormentas grandes.
 
-\paragraph{P1 --- Dónde y cuándo hay saturación.}
-\noindent Frecuencia por hora del día y ranking de zonas (top 14) según conteos de filas clasificadas como \texttt{saturacion}.
+  \item \textbf{Unas zonas se ``mojan'' antes que otras.} No todas reaccionan igual a la misma cantidad de agua. Con el mismo tipo de análisis por zona que alimenta el motor de alertas, en el archivo de calibración de referencia \textbf{Santiago} se comporta como zona \emph{frágil}: hace falta menos lluvia extra (del orden de \textbf{3{,}1\,mm/h} en el ejercicio lineal entre tramo ``saludable'' y saturación) para acercarse al ``rojo''. \textbf{Mitras Centro} es más \emph{resistente} (del orden de \textbf{11{,}9}\,mm/h). Entre extremos, la diferencia de ``fragilidad'' puede ir en torno a \textbf{uno a cuatro}. Los \textbf{umbrales de alerta por zona} (cuánta lluvia dispara el monitoreo en cada barrio) salen del propio historial; en el paquete de referencia van aproximadamente de \textbf{0{,}55} a \textbf{6{,}55}\,mm/h según zona y reglas de respaldo.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.48\linewidth]{../figures/p1_horas_saturacion.png}\hfill
-  \includegraphics[width=0.48\linewidth]{../figures/p1_zonas_saturacion.png}
-  \caption{P1: saturación por hora (Monterrey) y por zona.}
-\end{figure}
+  \item \textbf{Dinero e incentivos.} La relación simple ``cuánto se paga'' vs.\ ``qué tan cargado está el servicio'' es \textbf{débil} si se mira sola: subir tarifa no garantiza por sí solo arreglar el ratio. Los análisis con \textbf{lluvia y tarifa a la vez} y las lecturas \textbf{hora a hora} muestran que los incentivos \textbf{no funcionan igual} con sol que con aguacero; hay que combinar palancas, no confiar en una sola.
+\end{itemize}
 
-\paragraph{P3 --- Heterogeneidad espacial (lluvia).}
-\noindent Coeficiente marginal de precipitación sobre el ratio, con efectos fijos por hora dentro de cada zona.
+\section*{Qué implica para la operación (acciones concretas)}
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.82\linewidth]{../figures/p3_sensibilidad_zona.png}
-  \caption{P3: sensibilidad marginal a precipitación por zona (control por hora).}
-\end{figure}
+\begin{itemize}
+  \item Reforzar \textbf{turnos y supervisión} en las ventanas \textbf{12--14\,h} y \textbf{19--21\,h}.
+  \item Ante pronósticos de apenas \textbf{0{,}5\,mm/h}, ya aumenta mucho el riesgo relativo: conviene \textbf{plan de lluvia} e incentivos \textbf{diferenciados por zona}, no un solo umbral para toda la ciudad.
+  \item Revisar \textbf{presupuesto de incentivos}: hay días con mucho gasto y poco estrés (demasiada oferta de repartidores) y días con estrés sin gasto bien alineado; los bloques P4 y P6 del notebook ayudan a verlo.
+  \item El \textbf{Módulo~2} (motor de alertas) usa la \textbf{misma lógica} numérica que este diagnóstico al generar \path{calibration.json} vía \path{export_calibration_from_m1.py}. Si el mapa (polígono) de una zona viene incompleto en Excel, el clima se consulta en el \textbf{punto central} oficial de la zona (\texttt{ZONE\_INFO}), igual que en el código del motor.
+\end{itemize}
 
-\paragraph{P4 --- Earnings frente a estrés operativo.}
-\noindent Cada punto es un día: incentivo medio vs.\ fracción de celdas en saturación; útil para localizar días con alto estrés y alto (o bajo) incentivo.
+\section*{Contexto de marzo 2024 (eventos masivos)}
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.82\linewidth]{../figures/p4_earnings_vs_estres.png}
-  \caption{P4: dispersión diaria earn vs.\ fracción saturada.}
-\end{figure}
+\noindent En el mes analizado hubo en Monterrey eventos que concentran mucha gente y pueden \textbf{sumarse} a la lluvia y a los incentivos al explicar picos de demanda (no reemplazan el análisis numérico): festival \textbf{Tecate Pal Norte} y conciertos en \textbf{Parque Fundidora} / \textbf{Arena Monterrey} (cerca de la zona \textbf{Centro}), y el \textbf{Showcenter} en \textbf{San Pedro}. El día \textbf{28 de marzo} coincide con ese calendario de grandes eventos y ayuda a interpretar el pico de estrés observado.
 
-\paragraph{Sensibilidad (orden de magnitud).}
-\noindent Aproximación lineal local: mm/h adicionales asociados a un desplazamiento de ratio $\approx 0{,}6$ (tramo saludable hacia umbral de saturación), por zona.
+\vspace{0.3em}
+{\small\noindent\textbf{Figuras.} Generadas al ejecutar el notebook; carpeta: \path{modulo1_diagnostico/figures/}.}
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.82\linewidth]{../figures/p_sensitivity_mm_12_to_18.png}
-  \caption{Sensibilidad: precipitación necesaria por zona (aprox.\ lineal).}
-\end{figure}
+\section*{Glosario breve}
 
-\paragraph{Notas de interpretación (del notebook).}
-\noindent \texttt{ratio} $=$ \texttt{ORDERS}/\texttt{CONNECTED\_RT} (si conectados $=0$, ratio vacío). Clasificación: \texttt{saturacion} ($>1{,}8$), \texttt{sobre\_oferta} ($<0{,}5$), \texttt{saludable} ($0{,}9$--$1{,}2$), \texttt{intermedio} en otro caso. P2 usa MCO con dummies de hora y zona; P3 estima por zona \texttt{ratio $\sim$ precipitación + hora}; P5 introduce interacción \texttt{EARNINGS $\times$ precipitación} para no interpretar incentivos como efecto puro sin clima.
+\begin{itemize}
+  \item \textbf{MCO (mínimos cuadrados ordinarios):} forma de estimar ``si sube un poco la lluvia, cuánto cambia el ratio'' dejando fijos hora, zona y día, para no mezclar efectos.
+  \item \textbf{R$^2$ ajustado:} qué tanto del movimiento del ratio explica el modelo (aquí del orden del 72\,\%).
+  \item \textbf{p-valor:} si es casi cero, el patrón es muy poco creíble como pura casualidad \emph{dentro del modelo} (siguen valiendo los matices de datos observacionales).
+  \item \textbf{WKT:} texto con el dibujo de los polígonos de zona en el Excel.
+  \item \textbf{Centroide:} punto de referencia en el mapa cuando el polígono no se puede usar bien.
+\end{itemize}
 
 \end{document}

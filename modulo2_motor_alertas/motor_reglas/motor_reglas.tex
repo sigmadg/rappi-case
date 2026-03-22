@@ -1,47 +1,113 @@
 % Compilar: cd motor_reglas && pdflatex motor_reglas.tex
-% Objetivo: 1 página — umbrales y reglas del motor con vínculo a evidencia histórica (Módulo 1).
-\documentclass[10pt,a4paper]{article}
+% Lenguaje común + alineación con decision_engine.py y calibration.json
+\documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[spanish]{babel}
 \usepackage{geometry}
-\usepackage{amsmath}
-\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{microtype}
+\usepackage{array}
 \usepackage{enumitem}
-\geometry{margin=1.9cm}
-\setlist[itemize]{nosep,leftmargin=1.3em,topsep=2pt,parsep=0pt}
-\setlength{\parskip}{0.35em}
+\geometry{a4paper,margin=1.45cm}
+\setlength{\parskip}{0.38em}
 \setlength{\parindent}{0pt}
+\setlist[itemize]{nosep,leftmargin=1.2em,itemsep=0.25em,topsep=0.2em}
 
-\title{\textbf{Módulo 2 --- Justificación del motor de alertas}\\[0.2em]
-{\normalsize Umbrales y reglas con evidencia en datos históricos (1 página)}}
+\title{\textbf{¿Cómo funciona nuestro motor de alertas?}\\[0.2em]
+{\large Módulo 2}}
 \author{}
 \date{}
 
 \begin{document}
-\sloppy
 \maketitle
-\vspace{-0.6em}
+\vspace{-0.4em}
 
-\noindent\textbf{Objetivo.} Documentar por qué los parámetros y las reglas IF-THEN del motor (\texttt{decision\_engine.py}) están \textbf{calibrados con el mismo panel} que el Módulo~1 (\texttt{RAW\_DATA}: 30 días $\times$ 24\,h $\times$ 14 zonas) y cómo se combinan con el pronóstico en vivo.
+\section*{Qué problema resuelve}
 
-\paragraph{Evidencia en datos históricos.}
-El notebook \texttt{01\_diagnostico\_operacional} muestra que la precipitación co-mueve el \textbf{ratio} pedidos/repartidores: correlación global de Pearson precipitación--ratio $\approx 0{,}32$; $\mathbb{P}(\text{saturación}\mid \text{precip} > 0{,}5\,\mathrm{mm/h})$ es del orden de \textbf{8 veces} mayor que con precipitación baja; un MCO agregado da coeficiente marginal positivo de precipitación sobre el ratio (control por hora y zona). Eso \textbf{justifica} reglas condicionadas a lluvia y \textbf{heterogeneidad por zona} (pendientes distintas en P3).
+\noindent Este módulo ayuda a decidir, con \textbf{datos reales del mismo Excel} que el diagnóstico (30 días, 24 horas, 14 zonas), \textbf{cuándo vale la pena avisar} a operaciones y \textbf{cuánto sugerir pagar} a los repartidores cuando llueve o cuando el sistema va muy cargado. No son reglas inventadas: se \textbf{calibran} a partir del historial y se guardan en un archivo de configuración (\texttt{calibration.json}) que el programa lee al vuelo.
 
-\paragraph{Qué se estima del Excel y va a \texttt{calibration.json}.}
-(vía \texttt{export\_calibration\_from\_m1.py}, misma lógica que el notebook.)
+\section*{Por qué confiamos en estas reglas (la evidencia)}
+
 \begin{itemize}
-  \item Misma definición de ratio y saturación ($>1{,}8$) que M1; en \texttt{global}: \texttt{healthy\_ratio\_max} y \texttt{saturation\_ratio} (1{,}2 y 1{,}8).
-  \item \texttt{precip\_coef} y \texttt{sensitivity\_index}: regresión por zona como P3 (precipitación + efectos fijos de hora).
-  \item \texttt{alert\_precip\_mm\_hr}: p75 de precipitación en filas saturación; si p75 $<0{,}5$ mm/h, referencia 6{,}55 mm/h (saturación seca en el panel).
-  \item \texttt{mm\_precip\_healthy\_to\_saturation\_linear} $=0{,}6/\beta_z$ con $\Delta\rho=0{,}6$ (tramo 1{,}2--1{,}8).
-  \item \texttt{base\_earnings\_mxn}: mediana de \texttt{EARNINGS}; tope de incentivo 0{,}35 en \texttt{global}.
+  \item \textbf{Lluvia ligera ya importa.} En el panel, cuando la intensidad supera \textbf{0{,}5\,mm/h} en una hora, la probabilidad de ver saturación es del orden de \textbf{ocho veces} mayor que cuando la lluvia es más suave o nula. Eso justifica no esperar solo a tormentas grandes.
+  \item \textbf{La ciudad no es una sola pieza.} Algunas zonas se complican con poca agua y otras aguantan más. Por eso el motor lleva \textbf{números distintos por zona} (coeficientes y umbrales), estimados con la misma lógica que el notebook de Módulo~1.
+  \item \textbf{Continuidad M1 a M2.} Puedes volver a generar la configuración desde el Excel con \texttt{export\_calibration\_from\_m1.py}, de modo que alertas y análisis hablen el mismo idioma.
 \end{itemize}
 
-\paragraph{Reglas en tiempo de ejecución.}
-Ventana horaria (p.\,ej.\ 2\,h): sin alerta si $\max$ precip.\ $<$ umbral. Si no: $\hat\rho = \max(0{,}3,\, 1{,}05 + \beta_z \cdot \text{precip})$. Riesgo en cuatro niveles (BAJO--CRITICO) según $\hat\rho$ vs.\ $1{,}8$ y exceso lluvia/umbral. Incentivo: suma de componentes por tier, sensibilidad y exceso, con tope 35\,\%. Debounce evita repetir la misma severidad en el TTL; permite escalada.
+\section*{Ideas clave (sin perder rigor)}
 
-\paragraph{Pronóstico y mapas.}
-\textbf{Open-Meteo} (sin API key): precipitación horaria mm/h, zona horaria Monterrey. Coordenadas por zona: punto dentro del polígono WKT (\texttt{ZONE\_POLYGONS}) o centroides \texttt{ZONE\_INFO} si el WKT falta/trunca. Opción \texttt{--recalibrate} en \texttt{run\_alert\_engine.py} regenera el JSON desde el Excel antes de la API.
+\begin{itemize}
+  \item \textbf{Ratio y saturación.} El \textbf{ratio} es pedidos divididos entre repartidores conectados. En el caso, se trabaja con un tramo ``saludable'' alrededor de \textbf{1{,}2} y se considera \textbf{saturación} cuando el ratio supera \textbf{1{,}8}: demasiados pedidos para la capacidad disponible.
+  \item \textbf{Sensibilidad por zona (\texttt{sensitivity\_index}).} Es un puntaje relativo: indica qué zonas reaccionan con más fuerza al subir la lluvia, comparadas entre sí (no es un porcentaje de error del clima).
+  \item \textbf{Umbral de alerta (\texttt{alert\_precip\_mm\_hr}).} Ver sección siguiente: cómo se justifica con datos y por qué puede variar tanto entre zonas.
+  \item \textbf{Pagos sugeridos.} El \textbf{pago base} resume lo ``normal'' (mediana histórica por zona). El \textbf{pago recomendado} resume lo que en el pasado se pagaba de media cuando ya llovía por encima del umbral de alerta. El motor combina ambos con el ratio proyectado para proponer \textbf{cifras en pesos} (por ejemplo, subir de 55 a 78 MXN), sin pasarse de un \textbf{tope del 35\,\%} sobre el pago base.
+\end{itemize}
+
+\section*{Justificación del umbral de lluvia (\texttt{alert\_precip\_mm\_hr})}
+
+\noindent El umbral no es un número fijo ``por criterio de negocio a mano'': se \textbf{calcula desde el mismo Excel y la misma clasificación} que el Módulo~1 (columna \texttt{clasificacion}, tramo saludable / saturación).
+
+\begin{itemize}
+  \item \textbf{Qué pregunta responde.} ``¿A partir de qué intensidad de lluvia (mm/h) en el pronóstico conviene tratar el caso como \emph{alertable} para esta zona?'', de forma \textbf{coherente con el histórico} donde esa zona ya apareció en saturación operativa.
+  \item \textbf{Cómo se estima (por zona).} Se toman las filas del panel donde esa zona está en \textbf{saturación}. Sobre esas filas se calcula el \textbf{percentil 75} de la precipitación horaria (\texttt{PRECIPITATION\_MM}). Ese valor resume ``cuánta lluvia había en la mayoría de las horas malas'', sin quedarse solo en el caso más extremo (sería inestable) ni en la mediana (demasiado suave si hay colas largas).
+  \item \textbf{Por qué a veces sale un número muy bajo o muy alto.} Zonas donde la saturación aparece con poca lluvia tienen umbral bajo (el sistema se estresa con llovizna). Zonas donde hace falta mucha agua para saturar heredan umbral alto: el gatillo solo salta con lluvia fuerte.
+  \item \textbf{Respaldo 6{,}55\,mm/h.} Si en esa zona el percentil 75 en horas saturadas es menor que \textbf{0{,}5}\,mm/h, el panel sugiere mucha ``saturación en seco'' (ruido u otros factores) y el percentil ya no discrimina bien. Entonces se aplica un \textbf{valor de referencia} del caso empaquetado (misma regla que en \texttt{export\_calibration\_from\_m1.py}) para no disparar alertas con casi cero lluvia por artefacto del histórico.
+  \item \textbf{Recalibración.} Si cambia el Excel o las reglas de clasificación en M1, se vuelve a generar \texttt{calibration.json} y los umbrales se actualizan en bloque; el motor solo lee el JSON.
+\end{itemize}
+
+\section*{Qué hace el motor, paso a paso}
+
+\begin{enumerate}
+  \item \textbf{Mira el clima:} consulta pronóstico horario (Open-Meteo, sin API key) para cada zona. Si el mapa en Excel está incompleto, usa el \textbf{punto central} oficial de la zona.
+  \item \textbf{Decide si vale la pena alertar:} toma la lluvia máxima esperada en una ventana corta (por defecto unas 2 horas). Si está \textbf{por debajo} del umbral de \emph{esa} zona, no molesta al equipo: no hay alerta.
+  \item \textbf{Proyecta la carga:} combina la lluvia con el coeficiente histórico de la zona (parte fija 1{,}05 más el efecto de la lluvia, con piso razonable).
+  \item \textbf{Etiqueta el riesgo} en cuatro niveles (\textbf{BAJO}, \textbf{MEDIO}, \textbf{ALTO}, \textbf{CRÍTICO}) mezclando ese ratio proyectado con qué tan fuerte llueve comparado con el gatillo de la zona. Los cortes exactos están en \texttt{classify\_risk\_expert} dentro de \texttt{decision\_engine.py}.
+  \item \textbf{Sugiere MXN} y puede señalar otras zonas a vigilar.
+  \item \textbf{No satura de mensajes:} aplica reglas de \emph{debounce} (no reenviar el mismo evento si nada empeora de verdad), tiempo de espera (\textbf{TTL}) y, si se configura, un tiempo mínimo entre alertas de cualquier zona.
+\end{enumerate}
+
+\section*{Dos zonas opuestas (ejemplo del caso)}
+
+\noindent
+{\renewcommand{\arraystretch}{1.15}%
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Idea} & \textbf{Santiago (más frágil)} & \textbf{Mitras Centro (más resistente)} \\
+\midrule
+Sensibilidad a la lluvia & Alta (índice 1{,}0 en el JSON de referencia): con poca agua ya se mueve la operación. & Baja (alrededor de 0{,}26): el patrón local aguanta mejor el agua. \\
+Gatillo de alerta & 0{,}55\,mm/h: se activa con llovizna. & 6{,}55\,mm/h: hace falta lluvia fuerte para pasar el filtro. \\
+Orden de magnitud (mm/h) & Unos \textbf{3{,}1}\,mm/h para acercarse al ``rojo''. & Unos \textbf{11{,}9}\,mm/h: necesita mucha más agua para un salto parecido. \\
+Qué suele pedir el mensaje & Subir incentivos antes. & Mantener pagos base salvo tormenta seria. \\
+\bottomrule
+\end{tabularx}%
+}
+
+\section*{Cómo leer los cuatro niveles de riesgo}
+
+\begin{itemize}
+  \item \textbf{BAJO:} hay presión, pero todavía lejos de lo peor según las reglas del motor.
+  \item \textbf{MEDIO:} conviene monitorear y preparar acciones.
+  \item \textbf{ALTO:} priorizar respuesta operativa.
+  \item \textbf{CRÍTICO:} combinación muy mala (lluvia extrema o ratio proyectado muy por encima de saturación); el incentivo puede acercarse al \textbf{tope del 35\,\%} respecto al pago base.
+\end{itemize}
+
+\section*{Anti-fatiga (por qué no llenan de avisos al coordinador)}
+
+\noindent Si la severidad no sube y la lluvia no empeora de forma clara, \textbf{no se reenvía} el mismo aviso dentro de un tiempo (debounce). Tras un aviso, la zona espera un periodo (\textbf{TTL}) antes de repetir avisos parecidos. Opcionalmente se puede exigir un tiempo mínimo entre alertas de \emph{cualquier} zona.
+
+\section*{Si cambian los datos}
+
+\noindent Open-Meteo entrega lluvia horaria coherente con el Excel. Si se actualiza el panel, se puede ejecutar \texttt{run\_alert\_engine.py --recalibrate} para regenerar \texttt{calibration.json} antes de consultar el clima en vivo.
+
+\section*{Glosario}
+
+\begin{itemize}
+  \item \textbf{MCO:} método usado en M1 para estimar el efecto de la lluvia sobre el ratio dejando fijos hora y calendario.
+  \item \textbf{JSON:} formato de texto donde se guardan umbrales y pagos por zona.
+  \item \textbf{WKT:} descripción textual de polígonos en el Excel; si viene truncado, se usa el centroide.
+  \item \textbf{TTL:} tiempo de espera entre avisos parecidos; va de la mano con el debounce.
+\end{itemize}
 
 \end{document}

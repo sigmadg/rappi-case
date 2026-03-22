@@ -24,7 +24,9 @@ Esta sección resume lo que suele pedir una revisión de **README + entorno + de
 | Pieza | Uso | Notas |
 |-------|-----|--------|
 | **Python 3.11+** | Obligatorio | Mismo runtime para M1 (notebook), M2 y M3. |
-| **venv + pip** | Obligatorio | `python3 -m venv .venv` y `pip install -r requirements.txt`. **No hay Dockerfile ni `environment.yml` obligatorios** en este repo; si usas Conda, crea un env con Python 3.11 e instala `requirements.txt` dentro. |
+| **venv + pip** | Obligatorio (desarrollo local) | `python3 -m venv .venv` y `pip install -r requirements.txt`. |
+| **Docker** | Opcional | Hay **`Dockerfile`** en la raíz: un contenedor con Django + monitor + puente `/tick` (ver **`docker/README.md`**). No sustituye venv si trabajas en notebook. |
+| **Conda** | Opcional | Si lo usas, crea un env con Python 3.11 e instala `requirements.txt` dentro. |
 | **Jupyter / VS Code + Jupyter** | Módulo 1 | Para ejecutar `01_diagnostico_operacional.ipynb`. |
 | **Ollama** | Opcional (M3) | Solo si `LLM_PROVIDER=ollama` y quieres texto vía modelo local; si no, el agente puede usar **plantilla sin LLM** o **OpenAI**. |
 | **pdflatex** | Opcional | Solo si compilas informes Beamer/LaTeX (`demo_caso_tecnico/`, `modulo1_diagnostico/…`). |
@@ -44,7 +46,8 @@ Esta sección resume lo que suele pedir una revisión de **README + entorno + de
 | `OPENAI_MODEL` | OpenAI | p. ej. `gpt-4o-mini`. |
 | `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | Si usas Ollama | Servidor local y nombre del modelo. |
 | `ALERT_DEBOUNCE_TTL_SEC` | M2/M3 | TTL del debounce (segundos); tiene default en código. |
-| `MONITOR_INTERVAL_SEC` | Monitor | Segundos entre ciclos de `monitor_loop.py`; default 600. |
+| `MONITOR_INTERVAL_SEC` | Monitor | Segundos entre ciclos de `monitor_loop.py`; default 600 (mín. 15 s en código). |
+| `TELEGRAM_MONITOR_PING` | Monitor (M3) | `0` (default): alertas reales + avisos de debounce; `1`: además ping corto de vigilancia. Detalle en `modulo3_agente_telegram/README.md`. |
 | `USE_LANGCHAIN` | OpenAI | `1` (LangChain LCEL) o `0` (solo SDK). |
 
 **Sin API key de pago:** Open-Meteo no requiere key. Telegram Bot API no cobra por uso típico de bots.
@@ -56,6 +59,8 @@ Esta sección resume lo que suele pedir una revisión de **README + entorno + de
 3. **`TELEGRAM_CHAT_ID`:** puedes poner el **@usuario_del_canal** (p. ej. `@mi_canal_demo`) si es público, o el **id numérico** tipo `-100…` (útil para canales privados; se obtiene con bots como @userinfobot tras un mensaje en el canal o vía `getUpdates` si escribes al bot).
 4. Coloca token y chat id en **`.env`** en la raíz del repo (los scripts M3 cargan `caso_tecnico/.env`).
 5. Prueba: desde la raíz del repo, `python modulo3_agente_telegram/run_agent.py --test-telegram` (debe llegar un mensaje corto al destino).
+
+**Canal de demostración del caso (alertas publicadas por el bot):** [Examen_Rappi en Telegram](https://t.me/examen_rappi) (`@examen_rappi`).
 
 Si el bot no publica: revisa que sea **admin del canal** y que el token no esté revocado en BotFather.
 
@@ -87,7 +92,13 @@ Ejecuta desde la raíz del clon salvo que se indique otra carpeta. Asume **venv 
    - `python modulo3_agente_telegram/run_agent.py --test-telegram`
    - `python modulo3_agente_telegram/run_agent.py --demo --dry-run` (sin enviar, muestra lógica)
    - `python modulo3_agente_telegram/run_agent.py --demo --force-send` (envía al canal si `.env` está bien)
-3. *(Opcional)* Monitor continuo: `python modulo3_agente_telegram/monitor_loop.py --interval-sec 600` (ver `modulo3_agente_telegram/README.md`).
+3. **Monitor continuo (local, recomendado con el venv del repo):** desde la raíz `caso_tecnico/`:
+   ```bash
+   .venv/bin/python modulo3_agente_telegram/monitor_loop.py
+   ```
+   Usa `MONITOR_INTERVAL_SEC` y `TELEGRAM_MONITOR_PING` del `.env` (ver `modulo3_agente_telegram/README.md`). Una pasada y salir: añade `--once`.
+
+4. **Monitor en Docker:** el mismo `monitor_loop.py` arranca **dentro del contenedor** (ver **`docker/README.md`**). Monta `./.env` en `/app/.env` y define en tu `.env` del host, por ejemplo, `MONITOR_DRY_RUN=0` para enviar alertas reales a Telegram (por defecto el monitor en Docker va con `--dry-run`).
 
 Más detalle: **`modulo2_motor_alertas/README.md`**, **`modulo3_agente_telegram/README.md`**, **`django_viz/README.md`**.
 
@@ -138,23 +149,30 @@ caso_tecnico/
 ├── django_viz/           # dashboard Django: datos, pipeline, calibración, figuras M1
 ├── docker/               # entrypoint + README del contenedor único
 ├── Dockerfile            # imagen: Django + monitor + POST /tick (puente n8n)
+├── docker-compose.yml    # opcional: docker compose up --build (requiere plugin Compose)
+├── scripts/docker_up.sh  # Docker sin Compose: build + run (si falla docker compose)
+├── scripts/install_docker_compose_plugin.sh  # instala plugin compose desde GitHub (sin apt)
 ├── requirements.txt
 └── .env.example
 ```
 
-## Docker (un `docker run`)
+## Docker (build + `docker run`)
 
-Dashboard, monitor periódico y API `POST /tick` en **un solo contenedor** (ver **`docker/README.md`**):
+Dashboard, monitor periódico y API `POST /tick` en **un solo contenedor** (detalle en **`docker/README.md`**). Primero construyes la imagen; después un solo `docker run` levanta todo.
 
 ```bash
 docker build -t caso-tecnico .
 docker run --rm --name caso-tecnico -p 8000:8000 -p 8090:8090 \
-  -v "$(pwd)/.env:/app/.env:ro" \
   -v "$(pwd)/data:/app/data:ro" \
+  -v "$(pwd)/.env:/app/.env:ro" \
   caso-tecnico
 ```
 
-→ <http://127.0.0.1:8000/> · puente n8n: `http://127.0.0.1:8090/tick` (el monitor va en **dry-run** por defecto dentro del contenedor).
+- **`data/`**: debe existir `data/rappi_delivery_case_data.xlsx` en el host (el volumen monta el Excel).
+- **`.env`**: el archivo debe existir en el host antes de montarlo (p. ej. `cp .env.example .env`). Si aún no tienes `.env`, omite la línea `-v …/.env` hasta crearlo.
+- → <http://127.0.0.1:8000/> · puente: `http://127.0.0.1:8090/tick` · el monitor va en **dry-run** por defecto; pon **`MONITOR_DRY_RUN=0`** en tu `.env` del host para envío real (Compose y `./scripts/docker_up.sh` lo inyectan; ver **`docker/README.md`**).
+
+**Compose:** con plugin (`docker compose version` OK): `docker compose up --build`. Si el puerto **8000** está ocupado: `CASO_HOST_HTTP=8001 CASO_HOST_BRIDGE=8091 docker compose up --build` (o `./scripts/docker_up.sh`). Si ves **`unknown flag: --build`**, instala el plugin Compose o usa **`./scripts/docker_up.sh`**.
 
 ## Entorno (copiar y pegar)
 
@@ -234,9 +252,11 @@ python modulo3_agente_telegram/run_agent.py --demo --dry-run
 python modulo3_agente_telegram/run_agent.py --demo --force-send
 python modulo3_agente_telegram/run_agent.py --daily-summary --dry-run   # resumen del día
 
-# Monitor continuo (Open-Meteo cada N s, LangChain LCEL + debounce)
-python modulo3_agente_telegram/monitor_loop.py --interval-sec 600
+# Monitor continuo (Open-Meteo cada N s; intervalo también vía MONITOR_INTERVAL_SEC en .env)
+.venv/bin/python modulo3_agente_telegram/monitor_loop.py
 ```
+
+En Docker: el monitor ya corre en el stack (`docker compose up` / `docker run`); opciones en **`docker/README.md`**.
 
 Detalle, Telegram, cron y **monitor**: **`modulo3_agente_telegram/README.md`**.
 
@@ -270,4 +290,3 @@ python manage.py runserver
 ## Dataset
 
 El archivo Excel original puede permanecer en la raíz del proyecto; la copia de trabajo para scripts es `data/rappi_delivery_case_data.xlsx`.
-# rappi-case

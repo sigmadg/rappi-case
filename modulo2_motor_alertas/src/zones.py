@@ -19,11 +19,21 @@ from shapely.geometry import Point
 
 
 def project_root() -> Path:
+    """Raíz del repo (dos niveles por encima de este archivo: .../caso_tecnico)."""
     return Path(__file__).resolve().parents[2]
 
 
 def load_zone_polygons(xlsx: Path) -> Dict[str, object]:
-    # WKT debe leerse como texto; si Excel/pandas infieren float, Shapely falla.
+    """
+    Devuelve ``{nombre_zona: geometría Shapely}`` solo para filas con WKT parseable.
+
+    WKT debe leerse como texto; si Excel/pandas infieren float, Shapely falla.
+    Celdas demasiado largas suelen indicar **truncado** en Excel (~32k caracteres);
+    un WKT cortado no es geometría válida: esas zonas **no** entran aquí y el
+    pipeline usa ``LATITUDE_CENTER``/``LONGITUDE_CENTER`` de ``ZONE_INFO`` en
+    :func:`lat_lon_for_forecast_query` (degradación explícita ante datos fuente
+    imperfectos, sin perder filas de ``RAW_DATA``).
+    """
     df = pd.read_excel(xlsx, sheet_name="ZONE_POLYGONS", dtype={"GEOMETRY_WKT": str})
     out: Dict[str, object] = {}
     for _, row in df.iterrows():
@@ -45,6 +55,10 @@ def load_zone_polygons(xlsx: Path) -> Dict[str, object]:
 def zone_for_lon_lat(
     lon: float, lat: float, polygons: Dict[str, object]
 ) -> Optional[str]:
+    """
+    Dado un punto (lon, lat), devuelve el nombre de la primera zona cuyo polígono
+    **contiene** ese punto, o None si no cae en ninguno (tests de coherencia).
+    """
     p = Point(lon, lat)
     for name, geom in polygons.items():
         if geom.contains(p):
@@ -53,6 +67,7 @@ def zone_for_lon_lat(
 
 
 def load_centroids(xlsx: Path) -> pd.DataFrame:
+    """Lee la hoja ZONE_INFO (centroides y metadatos por zona operativa)."""
     return pd.read_excel(xlsx, sheet_name="ZONE_INFO")
 
 
@@ -61,7 +76,12 @@ def validate_excel_zone_consistency(xlsx: Path) -> Tuple[List[str], Dict[str, An
     Cruza **RAW_DATA**, **ZONE_INFO** y **ZONE_POLYGONS** (mismo criterio Módulo 1 → Módulo 2).
 
     Comprueba que los nombres de zona coincidan entre hojas y cuente cuántos WKT son
-    parseables (los truncados en Excel quedan fuera de `load_zone_polygons`).
+    parseables. Los **truncados u otros WKT inválidos** en Excel no entran en
+    ``load_zone_polygons``; para esas zonas el motor **no** elimina datos del panel:
+    la consulta de clima usa **centroides oficiales** ``LATITUDE_CENTER`` /
+    ``LONGITUDE_CENTER`` desde **ZONE_INFO** (véase ``lat_lon_for_forecast_query``).
+    Eso es la política de respaldo documentada en el notebook de diagnóstico
+    («Validación de polígonos»).
 
     Returns:
         (advertencias, resumen con claves n_rows_raw, n_zones, n_polygons_valid, zone_names)
@@ -71,6 +91,7 @@ def validate_excel_zone_consistency(xlsx: Path) -> Tuple[List[str], Dict[str, An
     zpoly = pd.read_excel(xlsx, sheet_name="ZONE_POLYGONS", dtype={"GEOMETRY_WKT": str})
 
     warnings: List[str] = []
+    # Conjuntos de nombres para comparar consistencia entre hojas
     zones_raw = set(raw["ZONE"].dropna().astype(str).unique())
     zones_info = set(zinfo["ZONE"].astype(str))
     zones_poly = set(zpoly["ZONE_NAME"].astype(str))
@@ -89,6 +110,7 @@ def validate_excel_zone_consistency(xlsx: Path) -> Tuple[List[str], Dict[str, An
         )
 
     polys = load_zone_polygons(xlsx)
+    # Zonas que figuran en INFO pero no tienen geometría cargada (WKT mal/truncado)
     missing_wkt = zones_info - set(polys.keys())
     if missing_wkt:
         warnings.append(
@@ -124,15 +146,18 @@ def lat_lon_for_forecast_query(
     """
     geom = polygons.get(zone_name)
     if geom is not None:
+        # Punto robusto dentro del polígono (no siempre el centroide matemático)
         rp = geom.representative_point()
         lon, lat = float(rp.x), float(rp.y)
         mapped = zone_for_lon_lat(lon, lat, polygons)
         if mapped == zone_name:
             return lat, lon, "wkt_polygon"
+    # Respaldo: coordenadas tabuladas en ZONE_INFO (siempre disponibles por zona)
     lat = float(zone_info_row["LATITUDE_CENTER"])
     lon = float(zone_info_row["LONGITUDE_CENTER"])
     return lat, lon, "centroid_fallback"
 
 
 def default_data_path() -> Path:
+    """Ruta por defecto al Excel del caso (carpeta ``data/`` en la raíz del repo)."""
     return project_root() / "data" / "rappi_delivery_case_data.xlsx"

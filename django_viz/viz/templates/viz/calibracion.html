@@ -2,7 +2,13 @@
 {% block title %}Calibración{% endblock %}
 {% block content %}
 <h1 class="h3 mb-2">calibration.json (Módulo 2)</h1>
-<p class="text-muted">Parámetros por zona generados desde el histórico (M1). Archivo: <code>{{ path }}</code></p>
+<p class="text-muted mb-3">
+  Parámetros por zona derivados del diagnóstico M1 (histórico Excel + notebook). Incluye
+  <code>alert_precip_mm_hr</code>, sensibilidad, tramo saludable→saturación (mm/h lineal),
+  <code>base_earnings_mxn</code> y <code>recommended_earnings_mxn</code> (objetivo de incentivo según M1).
+  La sección <code>global</code> fija ratios de referencia e <code>incentive_cap_pct</code>.
+  Archivo: <code>{{ path }}</code>
+</p>
 
 {% if error %}
 <div class="alert alert-warning">{{ error }}</div>

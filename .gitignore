@@ -6,6 +6,7 @@ __pycache__/
 modulo1_diagnostico/notebooks/*_executed.ipynb
 modulo2_motor_alertas/.alert_dedupe.json
 modulo2_motor_alertas/.alert_state.json
+modulo2_motor_alertas/.telegram_monitor_ping_ts
 modulo2_motor_alertas/.alert_events.jsonl
 modulo2_motor_alertas/.monitor_ticks.jsonl
 modulo2_motor_alertas/.monitor_status.json

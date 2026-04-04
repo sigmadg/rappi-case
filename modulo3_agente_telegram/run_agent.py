@@ -32,8 +32,6 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 # ---------------------------------------------------------------------------
 # Rutas: este archivo vive en modulo3_agente_telegram/; M2 es la carpeta hermana.
 # Se antepone src/ de M3 y M2 a sys.path para importar pipeline_core, weather_client, etc.
@@ -43,8 +41,14 @@ M2 = ROOT.parent / "modulo2_motor_alertas"
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(M2 / "src"))
 
-# Variables de entorno (Telegram, LLM, debounce, clima) desde la raíz del repo.
-load_dotenv(ROOT.parent / ".env")
+from env_bootstrap import (  # noqa: E402
+    load_repo_dotenv,
+    normalize_ollama_for_docker_container,
+)
+
+# Telegram / LLM / debounce: .env sin pisar env del contenedor (Django/entrypoint ya fijó OLLAMA).
+load_repo_dotenv(ROOT.parent)
+normalize_ollama_for_docker_container()
 
 from pipeline_core import M2 as M2_PATH  # noqa: E402
 from pipeline_core import run_operational_tick  # noqa: E402
@@ -174,8 +178,10 @@ def main() -> None:
     if st == "sent":
         if r.get("dry_run"):
             print(r.get("text", ""))
+            print(f"used_llm={r.get('used_llm')}")
             return
         print("Mensaje enviado a Telegram.")
+        print(f"used_llm={r.get('used_llm')}")
         return
 
     print(f"Estado inesperado: {r}", file=sys.stderr)

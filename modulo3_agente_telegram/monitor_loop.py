@@ -26,14 +26,15 @@ import sys
 import time
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 ROOT = Path(__file__).resolve().parent
 M2 = ROOT.parent / "modulo2_motor_alertas"
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(M2 / "src"))
 
-load_dotenv(ROOT.parent / ".env")
+from env_bootstrap import load_repo_dotenv, normalize_ollama_for_docker_container  # noqa: E402
+
+load_repo_dotenv(ROOT.parent)
+normalize_ollama_for_docker_container()
 
 
 def _require_telegram_if_monitor_ping() -> None:
@@ -56,6 +57,7 @@ def _require_telegram_if_monitor_ping() -> None:
 
 from langchain_monitor import build_monitor_chain, default_interval_sec  # noqa: E402
 from monitor_tick_log import record_monitor_error  # noqa: E402
+from ops_prometheus import ensure_monitor_metrics_server, record_monitor_chain_error  # noqa: E402
 
 
 def main() -> None:
@@ -103,6 +105,12 @@ def main() -> None:
         f"force_send={args.force_send}). Ctrl+C para detener.",
         flush=True,
     )
+    if ensure_monitor_metrics_server():
+        from ops_prometheus import ensure_metrics_registered_for_scrape
+
+        ensure_metrics_registered_for_scrape()
+        mp = int(os.environ.get("PROMETHEUS_MONITOR_METRICS_PORT", "9108"))
+        print(f"[monitor] Métricas Prometheus → http://0.0.0.0:{mp}/metrics", flush=True)
 
     while True:
         try:
@@ -119,6 +127,10 @@ def main() -> None:
         except Exception as e:
             # Excepción no controlada en la cadena: log stderr + línea en monitor_tick (status error).
             print(f"[monitor] error: {e}", flush=True, file=sys.stderr)
+            try:
+                record_monitor_chain_error()
+            except Exception:
+                pass
             try:
                 record_monitor_error(
                     M2,

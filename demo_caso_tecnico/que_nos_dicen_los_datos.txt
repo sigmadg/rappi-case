@@ -1,0 +1,38 @@
+================================================================================
+Caso técnico Rappi — demo (presentacion_demo.tex)
+Texto retirado de las láminas: «Qué nos dicen los datos»
+Úsalo como guion oral, notas del presentador o anexo; no está en el PDF.
+================================================================================
+
+--- Ratio por zona (exploración · boxplots por territorio) ---
+
+Las zonas no son homogéneas: en algunas el comportamiento es más estable; en
+otras aparecen colas largas y valores muy altos, señal de episodios donde la
+demanda se alejó mucho de lo habitual frente a la oferta de repartidores. Esa
+heterogeneidad es la base para tratar cada zona con umbrales y sensibilidad
+distintos en la calibración y en el motor de alertas.
+
+
+--- P1 · Saturación por hora del día (todas las zonas) ---
+
+La saturación casi no aparece de madrugada ni por la mañana; se concentra en
+dos ventanas claras, alineadas con comida y cena. El pico del mediodía
+(alrededor de 12–14 h) es más intenso que el de la noche (19–21 h): la presión
+operativa global del caso es fuertemente cíclica y domina el almuerzo.
+
+
+--- P1 · Zonas con más celdas en saturación (top del panel) ---
+
+El problema no es una sola zona: varias áreas del metro acumulan muchas celdas
+saturadas, con conteos parejos en la cima del ranking. Sirve para priorizar
+vigilancia y para calibrar reglas por territorio, no solo un disparador global.
+
+
+--- P1 · Patrón horario por zona (una gráfica por zona) ---
+
+Casi todas las zonas muestran un patrón bimodal (comida y cena); en muchas el
+mediodía es el peor tramo. Algunas series ensanchan la saturación hacia la tarde
+(p. ej. comportamiento menos acotado al pico), lo que refuerza que el costado
+temporal del riesgo también depende de la zona, no solo del reloj global.
+
+================================================================================

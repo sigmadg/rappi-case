@@ -10,7 +10,7 @@ Uso:
 
 Debounce: deduplicación por zona + evento (riesgo y precipitación); escalada MEDIO→CRITICO;
 opcional ALERT_GLOBAL_MIN_INTERVAL_SEC (mínimo entre alertas en cualquier zona).
-Estado: .alert_state.json
+Estado: ``.alert_state.json`` o env ``ALERT_STATE_PATH`` (debounce separado del monitor M3 en Docker).
 
 Orden de ``run()``:
   validar Excel → (opcional) recalibrar → clima por zona → motor → debounce → imprimir decisión.
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -52,7 +53,12 @@ from zones import (  # noqa: E402
 )
 
 CAL_PATH = ROOT / "calibration.json"
-STATE_PATH = ROOT / ".alert_state.json"
+_raw_state = (os.environ.get("ALERT_STATE_PATH") or "").strip()
+if _raw_state:
+    _p = Path(_raw_state)
+    STATE_PATH = (_p if _p.is_absolute() else ROOT / _p).resolve()
+else:
+    STATE_PATH = ROOT / ".alert_state.json"
 HORIZON = 2
 
 
@@ -148,12 +154,16 @@ def run(*, demo: bool = False, verbose: bool = False, recalibrate: bool = False)
             return 0
 
     precip_series = next(s for z, s in zone_precip if z == primary)
+    mx = max(precip_series[:HORIZON]) if precip_series else 0.0
     decision = decide_for_zone(primary, precip_series, cal, horizon_hours=HORIZON)
     if decision is None:
         print("No se pudo construir decisión.")
         return 1
 
-    thr_ctx = float(decision.expert_context.get("threshold_precip_mm_hr", 0))
+    thr_ctx = float(
+        decision.expert_context.get("threshold_precip_mm_hr_effective")
+        or decision.expert_context.get("threshold_precip_mm_hr", 0)
+    )
     emit, reason = should_emit_alert(
         decision.zone,
         decision.risk,
@@ -173,8 +183,6 @@ def run(*, demo: bool = False, verbose: bool = False, recalibrate: bool = False)
         )
         log.info("debounce omitido zona=%s %s", decision.zone, reason)
         return 0
-
-    mx = max(precip_series[:HORIZON]) if precip_series else 0.0
     # Enunciado 2c: solo las dos zonas más sensibles (además de la primaria)
     zcal = cal.get("zones") or {}
     sens_pairs = sorted(

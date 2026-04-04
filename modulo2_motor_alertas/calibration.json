@@ -116,6 +116,11 @@
   "global": {
     "healthy_ratio_max": 1.2,
     "saturation_ratio": 1.8,
-    "incentive_cap_pct": 0.35
+    "incentive_cap_pct": 0.35,
+    "local_timezone": "America/Monterrey",
+    "hour_risk_windows": [
+      {"start_hour": 12, "end_hour": 15, "label": "comida", "threshold_factor": 0.88, "risk_rank_boost": 0},
+      {"start_hour": 19, "end_hour": 21, "label": "cena", "threshold_factor": 0.9, "risk_rank_boost": 0}
+    ]
   }
 }

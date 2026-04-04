@@ -61,12 +61,16 @@
 
 \begin{enumerate}
   \item \textbf{Mira el clima:} consulta pronóstico horario (Open-Meteo, sin API key) para cada zona. Si el mapa en Excel está incompleto, usa el \textbf{punto central} oficial de la zona.
-  \item \textbf{Decide si vale la pena alertar:} toma la lluvia máxima esperada en una ventana corta (por defecto unas 2 horas). Si está \textbf{por debajo} del umbral de \emph{esa} zona, no molesta al equipo: no hay alerta.
+  \item \textbf{Decide si vale la pena alertar:} toma la lluvia máxima esperada en una ventana corta (por defecto unas 2 horas). Si está \textbf{por debajo} del umbral \textbf{efectivo} de \emph{esa} zona (el del JSON, posiblemente ajustado por franja horaria; ver sección siguiente), no molesta al equipo: no hay alerta.
   \item \textbf{Proyecta la carga:} combina la lluvia con el coeficiente histórico de la zona (parte fija 1{,}05 más el efecto de la lluvia, con piso razonable).
   \item \textbf{Etiqueta el riesgo} en cuatro niveles (\textbf{BAJO}, \textbf{MEDIO}, \textbf{ALTO}, \textbf{CRÍTICO}) mezclando ese ratio proyectado con qué tan fuerte llueve comparado con el gatillo de la zona. Los cortes exactos están en \texttt{classify\_risk\_expert} dentro de \texttt{decision\_engine.py}.
   \item \textbf{Sugiere MXN} y puede señalar otras zonas a vigilar.
   \item \textbf{No satura de mensajes:} aplica reglas de \emph{debounce} (no reenviar el mismo evento si nada empeora de verdad), tiempo de espera (\textbf{TTL}) y, si se configura, un tiempo mínimo entre alertas de cualquier zona.
 \end{enumerate}
+
+\section*{Ponderación por hora local (opcional)}
+
+\noindent En \texttt{calibration.json}, bajo \texttt{global}, se pueden definir \texttt{local\_timezone} (por defecto \texttt{America/Monterrey}) y una lista \texttt{hour\_risk\_windows}: franjas \texttt{start\_hour}--\texttt{end\_hour} con \texttt{threshold\_factor} menor que 1 para \textbf{exigir menos lluvia} en el pronóstico antes de alertar (p.\,ej.\ comida y cena, coherentes con horas críticas del Módulo~1). Opcionalmente, \texttt{risk\_rank\_boost} suma un escalón al nivel de riesgo. Desactivar todo: \texttt{hour\_risk\_enabled:\ false} o dejar \texttt{hour\_risk\_windows} vacío. La misma lógica ajusta la elección de \textbf{zona primaria} y el umbral que usa el \emph{debounce}.
 
 \section*{Dos zonas opuestas (ejemplo del caso)}
 

@@ -1,0 +1,11 @@
+# Carga dashboards JSON del directorio json/ (Grafana al iniciar).
+apiVersion: 1
+providers:
+  - name: caso-tecnico
+    orgId: 1
+    folder: Caso tecnico Rappi
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

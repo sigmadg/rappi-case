@@ -25,7 +25,7 @@ Esta sección resume lo que suele pedir una revisión de **README + entorno + de
 |-------|-----|--------|
 | **Python 3.11+** | Obligatorio | Mismo runtime para M1 (notebook), M2 y M3. |
 | **venv + pip** | Obligatorio (desarrollo local) | `python3 -m venv .venv` y `pip install -r requirements.txt`. |
-| **Docker** | Opcional | Hay **`Dockerfile`** en la raíz: un contenedor con Django + monitor + puente `/tick` (ver **`docker/README.md`**). No sustituye venv si trabajas en notebook. |
+| **Docker** | Opcional | **`Dockerfile`**: app en un contenedor. Con Compose: **`./scripts/docker_stack.sh`** (o `docker compose up --build`) añade **Prometheus** y **Grafana** (ver **`docker/README.md`**). |
 | **Conda** | Opcional | Si lo usas, crea un env con Python 3.11 e instala `requirements.txt` dentro. |
 | **Jupyter / VS Code + Jupyter** | Módulo 1 | Para ejecutar `01_diagnostico_operacional.ipynb`. |
 | **Ollama** | Opcional (M3) | Solo si `LLM_PROVIDER=ollama` y quieres texto vía modelo local; si no, el agente puede usar **plantilla sin LLM** o **OpenAI**. |
@@ -149,20 +149,38 @@ caso_tecnico/
 ├── django_viz/           # dashboard Django: datos, pipeline, calibración, figuras M1
 ├── docker/               # entrypoint + README del contenedor único
 ├── Dockerfile            # imagen: Django + monitor + POST /tick (puente n8n)
-├── docker-compose.yml    # opcional: docker compose up --build (requiere plugin Compose)
-├── scripts/docker_up.sh  # Docker sin Compose: build + run (si falla docker compose)
+├── docker-compose.yml    # app + Prometheus + Grafana (./scripts/docker_stack.sh)
+├── scripts/docker_up.sh    # Docker sin Compose: solo la app (build + run)
+├── scripts/docker_stack.sh # Docker Compose: app + Prometheus + Grafana
 ├── scripts/install_docker_compose_plugin.sh  # instala plugin compose desde GitHub (sin apt)
 ├── requirements.txt
 └── .env.example
 ```
 
-## Docker (build + `docker run`)
+## Docker
 
-Dashboard, monitor periódico y API `POST /tick` en **un solo contenedor** (detalle en **`docker/README.md`**). Primero construyes la imagen; después un solo `docker run` levanta todo.
+Detalle en **`docker/README.md`**. Dos formas:
+
+### Stack con observabilidad (recomendado si tienes Compose)
+
+**Prometheus** y **Grafana** están definidos en **`docker-compose.yml`** junto a la app.
+
+```bash
+./scripts/docker_stack.sh
+```
+
+Equivale a `docker compose up --build` e imprime las URLs (Django, puente, métricas `:9108`, Prometheus `:9090`, Grafana `:3000`). En segundo plano: `./scripts/docker_stack.sh -d`. Atajo: `./scripts/docker_up.sh stack`.
+
+Si un puerto del host está ocupado, usa variables como en el comentario del propio `docker-compose.yml` (p. ej. `CASO_HOST_HTTP`, `CASO_HOST_GRAFANA`, `CASO_HOST_PROMETHEUS`).
+
+### Solo la app (un contenedor, sin Compose)
+
+Dashboard, monitor periódico y API `POST /tick` en **un solo contenedor** (sin Grafana/Prometheus en contenedores aparte). Útil si no tienes el plugin Compose: **`./scripts/docker_up.sh`**.
 
 ```bash
 docker build -t caso-tecnico .
-docker run --rm --name caso-tecnico -p 8000:8000 -p 8090:8090 \
+docker run --rm --name caso-tecnico \
+  -p 8000:8000 -p 8090:8090 -p 9108:9108 \
   -v "$(pwd)/data:/app/data:ro" \
   -v "$(pwd)/.env:/app/.env:ro" \
   caso-tecnico
@@ -170,9 +188,9 @@ docker run --rm --name caso-tecnico -p 8000:8000 -p 8090:8090 \
 
 - **`data/`**: debe existir `data/rappi_delivery_case_data.xlsx` en el host (el volumen monta el Excel).
 - **`.env`**: el archivo debe existir en el host antes de montarlo (p. ej. `cp .env.example .env`). Si aún no tienes `.env`, omite la línea `-v …/.env` hasta crearlo.
-- → <http://127.0.0.1:8000/> · puente: `http://127.0.0.1:8090/tick` · el monitor va en **dry-run** por defecto; pon **`MONITOR_DRY_RUN=0`** en tu `.env` del host para envío real (Compose y `./scripts/docker_up.sh` lo inyectan; ver **`docker/README.md`**).
+- → <http://127.0.0.1:8000/> · puente: `http://127.0.0.1:8090/tick` · métricas del monitor: `http://127.0.0.1:9108/metrics` · el monitor va en **dry-run** por defecto; pon **`MONITOR_DRY_RUN=0`** en tu `.env` del host para envío real (Compose y `./scripts/docker_up.sh` lo inyectan; ver **`docker/README.md`**).
 
-**Compose:** con plugin (`docker compose version` OK): `docker compose up --build`. Si el puerto **8000** está ocupado: `CASO_HOST_HTTP=8001 CASO_HOST_BRIDGE=8091 docker compose up --build` (o `./scripts/docker_up.sh`). Si ves **`unknown flag: --build`**, instala el plugin Compose o usa **`./scripts/docker_up.sh`**.
+Si ves **`unknown flag: --build`** al usar `docker compose`, instala el plugin Compose o usa **`./scripts/docker_up.sh`** (solo app).
 
 ## Entorno (copiar y pegar)
 
@@ -256,7 +274,7 @@ python modulo3_agente_telegram/run_agent.py --daily-summary --dry-run   # resume
 .venv/bin/python modulo3_agente_telegram/monitor_loop.py
 ```
 
-En Docker: el monitor ya corre en el stack (`docker compose up` / `docker run`); opciones en **`docker/README.md`**.
+En Docker: el monitor ya corre en el stack (`./scripts/docker_stack.sh`, `docker compose up` o `docker run`); opciones en **`docker/README.md`**.
 
 Detalle, Telegram, cron y **monitor**: **`modulo3_agente_telegram/README.md`**.
 

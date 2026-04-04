@@ -7,13 +7,13 @@ Secciones:
   - ping_telegram_async: diagnóstico sin pasar por el motor (run_agent --test-telegram).
 """
 
-from __future__ import annotations
+from __future__ import annotations  # str | None en firmas
 
-import asyncio
-import os
+import asyncio  # Bot API es async; la capa sync envuelve con asyncio.run
+import os  # TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
-from telegram import Bot
-from telegram.error import Forbidden, InvalidToken, TelegramError
+from telegram import Bot  # Cliente oficial
+from telegram.error import Forbidden, InvalidToken, TelegramError  # Errores tipificados
 
 # Tokens de ejemplo del repo — no deben usarse en producción (falla explícita).
 _PLACEHOLDER_TOKENS = frozenset(
@@ -36,7 +36,7 @@ def _telegram_credentials_ok() -> tuple[str | None, str | None]:
     token = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
     chat_id = (os.environ.get("TELEGRAM_CHAT_ID") or "").strip()
     if _is_placeholder_token(token) or not chat_id:
-        return None, None
+        return None, None  # Ping deshabilitado hasta configurar bien .env
     return token, chat_id
 
 
@@ -80,7 +80,7 @@ async def _send_async(text: str, token: str, chat_id: str) -> None:
 
 def send_message(text: str, *, token: str | None = None, chat_id: str | None = None) -> None:
     t, c = _resolve_credentials(token, chat_id)
-    asyncio.run(_send_async(text, t, str(c)))
+    asyncio.run(_send_async(text, t, str(c)))  # Punto de entrada síncrono para pipeline/Django
 
 
 async def ping_telegram_async() -> str:
@@ -94,7 +94,7 @@ async def ping_telegram_async() -> str:
             "TELEGRAM_CHAT_ID=@tu_canal (o id -100...). Si no existe .env: cp .env.example .env"
         )
     bot = Bot(token=token)
-    me = await bot.get_me()
+    me = await bot.get_me()  # Verifica token y obtiene @username
     msg = (
         f"✅ Ping desde caso_tecnico (Módulo 3).\n"
         f"Bot: @{me.username}\n"

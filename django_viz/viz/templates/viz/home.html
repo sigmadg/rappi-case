@@ -79,8 +79,9 @@
   <div class="card-header" style="background: rgba(255,48,8,0.12);">Módulo 3 — Enviar a Telegram (forzar)</div>
   <div class="card-body">
     <p class="small mb-3" style="color:#c5d0e0;">
-      Ejecuta <code>run_agent.py --force-send</code>: <strong>ignora debounce</strong> (huella de evento + intervalo global / TTL por zona) y envía el mensaje en lenguaje natural al canal en <code>caso_tecnico/.env</code>.
-      Requiere <code>TELEGRAM_BOT_TOKEN</code> y <code>TELEGRAM_CHAT_ID</code>.
+      Ejecuta <code>run_agent.py --force-send</code>: <strong>ignora debounce</strong> (huella de evento + intervalo global / TTL por zona) y envía el mensaje al canal en <code>caso_tecnico/.env</code>.
+      El texto pasa por el mismo flujo que el monitor: <strong>motor M2 → RAG/LLM</strong> (Ollama/OpenAI según <code>LLM_PROVIDER</code>) o plantilla si el LLM falla.
+      Requiere <code>TELEGRAM_BOT_TOKEN</code> y <code>TELEGRAM_CHAT_ID</code>. En Docker, Ollama en el host: <code>OLLAMA_HOST=0.0.0.0</code> y revisa el aviso tras enviar: línea <code>used_llm=True/False</code>.
     </p>
     <form method="post" action="{% url 'telegram_force_alert' %}" class="d-flex flex-wrap gap-2 align-items-center">
       {% csrf_token %}

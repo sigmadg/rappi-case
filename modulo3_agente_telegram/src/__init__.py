@@ -1,1 +1,1 @@
-"""Agente de alertas con mensaje accionable + Telegram (Módulo 3)."""
+"""Paquete Módulo 3: pipeline operativo, Telegram, RAG/LLM, monitor y métricas."""

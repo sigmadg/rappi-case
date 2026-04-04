@@ -7,15 +7,15 @@ Persistencia de ciclos del monitor para dashboard / auditoría.
   ``.monitor_status.json`` (último ciclo, lectura rápida para Django ``/monitor/``).
 """
 
-from __future__ import annotations
+from __future__ import annotations  # Path | None
 
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict
+import json  # Serializar filas JSONL y snapshot de estado
+from datetime import datetime, timezone  # Marca UTC ISO en cada tick
+from pathlib import Path  # Rutas bajo modulo2_motor_alertas
+from typing import Any, Dict  # Config y filas flexibles
 
-TICKS_NAME = ".monitor_ticks.jsonl"
-STATUS_NAME = ".monitor_status.json"
+TICKS_NAME = ".monitor_ticks.jsonl"  # Append-only, una línea por ciclo
+STATUS_NAME = ".monitor_status.json"  # Último ciclo para API Django
 
 
 def m2_root_default() -> Path:
@@ -32,7 +32,7 @@ def record_monitor_cycle(cfg: Dict[str, Any], *, m2_root: Path | None = None) ->
     root.mkdir(parents=True, exist_ok=True)
     r = cfg.get("result")
     if not isinstance(r, dict):
-        r = {}
+        r = {}  # Normalizar salida del pipeline
     reason = r.get("reason")
     detail = r.get("detail")
     row: Dict[str, Any] = {
@@ -51,7 +51,7 @@ def record_monitor_cycle(cfg: Dict[str, Any], *, m2_root: Path | None = None) ->
     path = root / TICKS_NAME
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
-    snap = {"last": row, "updated_at": row["ts"]}
+    snap = {"last": row, "updated_at": row["ts"]}  # Formato esperado por api_monitor_json
     (root / STATUS_NAME).write_text(
         json.dumps(snap, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -67,7 +67,7 @@ def record_monitor_error(
     force_send: bool = False,
 ) -> None:
     now = datetime.now(timezone.utc).isoformat()
-    msg = str(message)[:2000]
+    msg = str(message)[:2000]  # Evitar líneas JSONL gigantes
     record_monitor_cycle(
         {
             "tick_started_at": None,

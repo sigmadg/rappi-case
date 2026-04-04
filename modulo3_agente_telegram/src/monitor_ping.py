@@ -10,19 +10,19 @@ Las **alertas reales** (LLM + plantilla) solo se envían cuando el motor + debou
 este ping no sustituye una alerta ni fuerza ``force_send``.
 """
 
-from __future__ import annotations
+from __future__ import annotations  # Dict[str, Any]
 
-import os
-import time
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict
+import os  # TELEGRAM_MONITOR_PING*, MONITOR_INTERVAL_SEC
+import time  # Throttle por archivo de último ping
+from datetime import datetime, timezone  # Cabecera “Hora UTC” en el mensaje
+from pathlib import Path  # m2_root / .telegram_monitor_ping_ts
+from typing import Any, Dict  # Resultado del tick serializado en texto corto
 
-from ops_logging import get_ops_logger
+from ops_logging import get_ops_logger  # Misma jerarquía caso_tecnico.* que el resto del repo
 
 _LOG = get_ops_logger("monitor_ping")
 
-_TS_NAME = ".telegram_monitor_ping_ts"
+_TS_NAME = ".telegram_monitor_ping_ts"  # Último epoch float escrito tras ping exitoso
 
 
 def monitor_ping_enabled() -> bool:
@@ -38,7 +38,7 @@ def monitor_ping_min_sec() -> int:
         # Mismo ritmo que el bucle del monitor (evita: 1.er ping OK y luego nada hasta 300 s).
         raw = (os.environ.get("MONITOR_INTERVAL_SEC") or "600").strip()
     try:
-        return max(15, min(int(raw), 86400))
+        return max(15, min(int(raw), 86400))  # Entre 15 s y 1 día
     except ValueError:
         return 300
 
@@ -47,11 +47,11 @@ def _throttle_allows(m2_root: Path) -> bool:
     path = m2_root / _TS_NAME
     min_sec = monitor_ping_min_sec()
     if not path.is_file():
-        return True
+        return True  # Primera vez: permitir
     try:
         last = float(path.read_text(encoding="utf-8").strip())
     except (ValueError, OSError):
-        return True
+        return True  # Archivo corrupto: no bloquear para siempre
     elapsed = time.time() - last
     if elapsed >= float(min_sec):
         return True
@@ -69,7 +69,7 @@ def _mark_ping_sent(m2_root: Path) -> None:
     try:
         path.write_text(str(time.time()), encoding="utf-8")
     except OSError:
-        pass
+        pass  # Throttle en memoria fallaría en siguiente arranque; aceptable
 
 
 def _format_ping(out: Dict[str, Any]) -> str:
@@ -107,7 +107,7 @@ def maybe_send_monitor_status_ping(
     distinto al texto ⏸️ Debounce); si ya se envió ``sent`` (alerta completa), no duplicar.
     """
     if validate:
-        return
+        return  # Modo checklist sin Telegram
     if not monitor_ping_enabled():
         return
     st = str(out.get("status") or "")
@@ -120,7 +120,7 @@ def maybe_send_monitor_status_ping(
     if not _throttle_allows(m2_root):
         return
     try:
-        from telegram_sender import send_message
+        from telegram_sender import send_message  # Import perezoso: mismo venv que el monitor
     except ImportError:
         _LOG.warning(
             "monitor ping omitido: no se importó telegram_sender (¿falta python-telegram-bot "

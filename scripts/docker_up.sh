@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
-# Mismo stack que docker-compose.yml pero SIN plugin "docker compose" (solo docker build + run).
-# Uso desde la raíz del repo: ./scripts/docker_up.sh
+# App en un solo contenedor (sin plugin Compose). Uso: ./scripts/docker_up.sh
+# Stack con Grafana + Prometheus: ./scripts/docker_up.sh stack   o   ./scripts/docker_stack.sh
 #
-# Si 8000/8090 están ocupados, busca el siguiente par libre (8001/8091, …) hasta CASO_DOCKER_PORT_TRIES.
-# Puertos base: CASO_DOCKER_PORT (default 8000), CASO_DOCKER_PORT_BRIDGE (default 8090).
+# Si 8000/8090/9108 están ocupados, busca el siguiente trío libre (8001/8091/9109, …) hasta CASO_DOCKER_PORT_TRIES.
+# Puertos base: CASO_DOCKER_PORT (8000), CASO_DOCKER_PORT_BRIDGE (8090), CASO_DOCKER_PORT_METRICS (9108).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Stack completo (Grafana + Prometheus): ./scripts/docker_up.sh stack  →  docker_stack.sh
+if [[ "${1:-}" == "stack" ]]; then
+  shift
+  exec "${ROOT}/scripts/docker_stack.sh" "$@"
+fi
+
+echo "[docker_up] Solo contenedor de la app (sin Prometheus ni Grafana). Stack completo: ./scripts/docker_up.sh stack | ./scripts/docker_stack.sh | docker compose up --build" >&2
+
 IMAGE="${CASO_DOCKER_IMAGE:-caso-tecnico}"
 NAME="${CASO_DOCKER_NAME:-caso-tecnico-run}"
 PORT_BASE="${CASO_DOCKER_PORT:-8000}"
 BRIDGE_BASE="${CASO_DOCKER_PORT_BRIDGE:-8090}"
+METRICS_BASE="${CASO_DOCKER_PORT_METRICS:-9108}"
 MAX_TRY="${CASO_DOCKER_PORT_TRIES:-40}"
+# Ollama en el host: URL que ve el *contenedor* (host.docker.internal gracias a --add-host).
+CASO_OLLAMA_URL="${CASO_OLLAMA_URL:-http://host.docker.internal:11434}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "No está instalado 'docker' en el PATH." >&2
@@ -48,23 +59,31 @@ fi
 
 H=""
 B=""
+M=""
 for ((i = 0; i < MAX_TRY; i++)); do
   H=$((PORT_BASE + i))
   B=$((BRIDGE_BASE + i))
-  if host_port_free "$H" && host_port_free "$B"; then
+  M=$((METRICS_BASE + i))
+  if host_port_free "$H" && host_port_free "$B" && host_port_free "$M"; then
     echo "[docker_up] run → ${NAME}"
     echo "[docker_up] Dashboard: http://127.0.0.1:${H}/"
     echo "[docker_up] Puente n8n:  http://127.0.0.1:${B}/tick"
+    echo "[docker_up] Métricas monitor: http://127.0.0.1:${M}/metrics"
+    echo "[docker_up] Ollama (LLM en el host): OLLAMA_BASE_URL=${CASO_OLLAMA_URL} — en el host suele hacer falta OLLAMA_HOST=0.0.0.0"
     exec docker run --rm --name "${NAME}" \
+      --add-host=host.docker.internal:host-gateway \
       -p "${H}:8000" \
       -p "${B}:8090" \
+      -p "${M}:9108" \
       -v "${ROOT}/data:/app/data:ro" \
       "${ENV_ARGS[@]}" \
       "${ENV_FILE_ARGS[@]}" \
+      -e "OLLAMA_BASE_URL=${CASO_OLLAMA_URL}" \
+      -e "ENABLE_RECALIBRATE_ON_START=${ENABLE_RECALIBRATE_ON_START:-1}" \
       "${IMAGE}"
   fi
 done
 
-echo "[docker_up] No hay puertos libres en el rango ${PORT_BASE}–$((PORT_BASE + MAX_TRY - 1)) (y bridge ${BRIDGE_BASE}–…)." >&2
-echo "[docker_up] Libera 8000/8090 u otro par, o define CASO_DOCKER_PORT / CASO_DOCKER_PORT_BRIDGE." >&2
+echo "[docker_up] No hay puertos libres en el rango ${PORT_BASE}–$((PORT_BASE + MAX_TRY - 1)) (bridge ${BRIDGE_BASE}–…, métricas ${METRICS_BASE}–…)." >&2
+echo "[docker_up] Libera 8000/8090/9108 u otro trío, o define CASO_DOCKER_PORT / CASO_DOCKER_PORT_BRIDGE / CASO_DOCKER_PORT_METRICS." >&2
 exit 1

@@ -19,6 +19,10 @@ Reglas (documentadas también en README):
   (≥3 obs.); si no, 1.15 × mediana de EARNINGS. `decide_for_zone` la usa con base_earnings_mxn
   para el objetivo MXN (interpolación según ratio proyectado).
 
+En ``global`` también se escriben ventanas de **ponderación horaria** (hora local operativa,
+p. ej. comida/cena alineadas a picos de saturación en M1): el motor reduce el umbral de
+lluvia de alerta en esas franjas y puede subir un escalón el riesgo (ver ``decision_engine``).
+
 Uso (venv activado):
   Desde la raíz del repo:  python modulo2_motor_alertas/export_calibration_from_m1.py
   Desde modulo2_motor_alertas/:  python export_calibration_from_m1.py
@@ -44,6 +48,14 @@ DEFAULT_GLOBAL = {
     "healthy_ratio_max": 1.2,
     "saturation_ratio": 1.8,
     "incentive_cap_pct": 0.35,
+    # Hora local para ponderar (Open-Meteo / operación MTY).
+    "local_timezone": "America/Monterrey",
+    # Franjas [start_hour, end_hour] inclusivas, 0–23. threshold_factor < 1 endurece el gate
+    # (alerta con menos lluvia). risk_rank_boost suma escalones BAJO→…→CRÍTICO (tope 4).
+    "hour_risk_windows": [
+        {"start_hour": 12, "end_hour": 15, "label": "comida", "threshold_factor": 0.88, "risk_rank_boost": 0},
+        {"start_hour": 19, "end_hour": 21, "label": "cena", "threshold_factor": 0.90, "risk_rank_boost": 0},
+    ],
 }
 
 

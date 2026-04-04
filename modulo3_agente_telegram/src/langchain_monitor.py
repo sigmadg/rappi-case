@@ -6,16 +6,16 @@ No sustituye las reglas del motor: la \"validación\" de si corresponde alerta n
 es ``should_emit_alert`` + umbrales; LangChain encadena los pasos de forma explícita.
 """
 
-from __future__ import annotations
+from __future__ import annotations  # Dict[str, Any] sin importar Dict desde typing en 3.9+
 
-import os
-from datetime import datetime, timezone
-from typing import Any, Dict
+import os  # MONITOR_INTERVAL_SEC para default_interval_sec
+from datetime import datetime, timezone  # Sellos de tiempo en el estado del tick
+from typing import Any, Dict  # Estado mutable que atraviesa la cadena LCEL
 
-from langchain_core.runnables import RunnableLambda
+from langchain_core.runnables import RunnableLambda  # Composición pipe |
 
-from monitor_tick_log import record_monitor_cycle
-from pipeline_core import run_operational_tick
+from monitor_tick_log import record_monitor_cycle  # Persistir tras cada invoke
+from pipeline_core import run_operational_tick  # Una pasada completa M2+M3
 
 
 # --- Paso 1 de la cadena LCEL: anotar inicio (útil en depuración y en JSON de monitor).
@@ -55,7 +55,7 @@ def _summarize_for_log(cfg: Dict[str, Any]) -> Dict[str, Any]:
             line += f" detail={d}"
     cfg["log_line"] = line
     try:
-        record_monitor_cycle(cfg)
+        record_monitor_cycle(cfg)  # No tumbar el bucle si disco lleno
     except OSError:
         pass
     return cfg

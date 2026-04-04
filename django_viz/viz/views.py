@@ -27,6 +27,35 @@ from .paths import (
     project_root,
 )
 
+# Claves LLM: si el proceso Django heredó ``VAR=`` vacío (p. ej. shell/Compose), el subproceso de
+# run_agent también arrancaba con huecos y python-dotenv no rellenaba; se completan desde .env aquí
+# y en env_bootstrap.load_repo_dotenv (doble capa).
+_LLM_ENV_KEYS = (
+    "OLLAMA_BASE_URL",
+    "LLM_PROVIDER",
+    "OLLAMA_MODEL",
+    "OLLAMA_TIMEOUT_SEC",
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "USE_LANGCHAIN",
+)
+
+
+def _fill_empty_llm_env_from_dotenv(env: Dict[str, str], repo_root: Path) -> None:
+    from dotenv import dotenv_values
+
+    p = repo_root / ".env"
+    if not p.is_file():
+        return
+    parsed = dotenv_values(p)
+    for k in _LLM_ENV_KEYS:
+        cur = env.get(k)
+        if cur is not None and str(cur).strip():
+            continue
+        v = parsed.get(k)
+        if v is not None and str(v).strip():
+            env[k] = str(v).strip()
+
 
 @require_POST
 def telegram_force_alert(request: HttpRequest) -> HttpResponse:
@@ -46,6 +75,7 @@ def telegram_force_alert(request: HttpRequest) -> HttpResponse:
         cmd.insert(-1, "--demo")
 
     env = os.environ.copy()
+    _fill_empty_llm_env_from_dotenv(env, root)
     try:
         proc = subprocess.run(
             cmd,

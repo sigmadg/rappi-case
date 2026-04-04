@@ -8,18 +8,19 @@ Orden típico en el motor:
   3) ``validate_excel_zone_consistency`` (opcional) avisa si nombres o WKT no cuadran.
 """
 
-from __future__ import annotations
+from __future__ import annotations  # Tipos forward en anotaciones
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path  # Rutas al Excel y a data/
+from typing import Any, Dict, List, Optional, Tuple  # Polígonos como dict nombre→geom
 
-import pandas as pd
-from shapely import wkt
-from shapely.geometry import Point
+import pandas as pd  # Lectura de hojas Excel
+from shapely import wkt  # Parser de Well-Known Text
+from shapely.geometry import Point  # Geometría punto para contains()
 
 
 def project_root() -> Path:
     """Raíz del repo (dos niveles por encima de este archivo: .../caso_tecnico)."""
+    # Este archivo: caso_tecnico/modulo2_motor_alertas/src/zones.py → parents[2] = repo
     return Path(__file__).resolve().parents[2]
 
 
@@ -34,20 +35,21 @@ def load_zone_polygons(xlsx: Path) -> Dict[str, object]:
     :func:`lat_lon_for_forecast_query` (degradación explícita ante datos fuente
     imperfectos, sin perder filas de ``RAW_DATA``).
     """
+    # dtype str evita que Excel convierta WKT a número científico
     df = pd.read_excel(xlsx, sheet_name="ZONE_POLYGONS", dtype={"GEOMETRY_WKT": str})
     out: Dict[str, object] = {}
-    for _, row in df.iterrows():
-        name = str(row["ZONE_NAME"])
-        raw = row["GEOMETRY_WKT"]
+    for _, row in df.iterrows():  # Cada fila es una zona con su polígono
+        name = str(row["ZONE_NAME"])  # Identificador operativo de la zona
+        raw = row["GEOMETRY_WKT"]  # Cadena WKT o NaN
         if not isinstance(raw, str) or not raw.strip():
-            continue
-        # Excel trunca celdas largas (~32767); WKT incompleto no parsea.
+            continue  # Sin geometría usable
+        # Excel trunca celdas largas (~32767); WKT incompleto no parsea de forma fiable
         if len(raw) >= 32700:
-            continue
+            continue  # Tratar como ausencia de polígono; se usará centroide
         try:
-            geom = wkt.loads(raw)
+            geom = wkt.loads(raw)  # Construir geometría Shapely
         except Exception:
-            continue
+            continue  # WKT inválido: omitir esta zona en el mapa polígono
         out[name] = geom
     return out
 
@@ -59,11 +61,11 @@ def zone_for_lon_lat(
     Dado un punto (lon, lat), devuelve el nombre de la primera zona cuyo polígono
     **contiene** ese punto, o None si no cae en ninguno (tests de coherencia).
     """
-    p = Point(lon, lat)
-    for name, geom in polygons.items():
+    p = Point(lon, lat)  # Shapely usa (x, y) = (lon, lat) en WGS84
+    for name, geom in polygons.items():  # Orden de iteración define desempate si solapan
         if geom.contains(p):
-            return name
-    return None
+            return name  # Primera zona que contiene el punto
+    return None  # Punto fuera de todas las geometrías cargadas
 
 
 def load_centroids(xlsx: Path) -> pd.DataFrame:
@@ -86,15 +88,15 @@ def validate_excel_zone_consistency(xlsx: Path) -> Tuple[List[str], Dict[str, An
     Returns:
         (advertencias, resumen con claves n_rows_raw, n_zones, n_polygons_valid, zone_names)
     """
-    raw = pd.read_excel(xlsx, sheet_name="RAW_DATA")
-    zinfo = pd.read_excel(xlsx, sheet_name="ZONE_INFO")
-    zpoly = pd.read_excel(xlsx, sheet_name="ZONE_POLYGONS", dtype={"GEOMETRY_WKT": str})
+    raw = pd.read_excel(xlsx, sheet_name="RAW_DATA")  # Panel operativo
+    zinfo = pd.read_excel(xlsx, sheet_name="ZONE_INFO")  # Centroides por zona
+    zpoly = pd.read_excel(xlsx, sheet_name="ZONE_POLYGONS", dtype={"GEOMETRY_WKT": str})  # Geometrías
 
-    warnings: List[str] = []
+    warnings: List[str] = []  # Mensajes humanos para log o consola
     # Conjuntos de nombres para comparar consistencia entre hojas
-    zones_raw = set(raw["ZONE"].dropna().astype(str).unique())
-    zones_info = set(zinfo["ZONE"].astype(str))
-    zones_poly = set(zpoly["ZONE_NAME"].astype(str))
+    zones_raw = set(raw["ZONE"].dropna().astype(str).unique())  # Zonas que aparecen en transacciones
+    zones_info = set(zinfo["ZONE"].astype(str))  # Zonas definidas en metadatos
+    zones_poly = set(zpoly["ZONE_NAME"].astype(str))  # Zonas con fila en polígonos
 
     if zones_raw != zones_info:
         warnings.append(
@@ -109,8 +111,8 @@ def validate_excel_zone_consistency(xlsx: Path) -> Tuple[List[str], Dict[str, An
             f"solo en POLY {sorted(zones_poly - zones_info)}"
         )
 
-    polys = load_zone_polygons(xlsx)
-    # Zonas que figuran en INFO pero no tienen geometría cargada (WKT mal/truncado)
+    polys = load_zone_polygons(xlsx)  # Solo entran WKT válidos y no truncados
+    # Zonas en INFO pero sin entrada en polys (WKT mal o truncado)
     missing_wkt = zones_info - set(polys.keys())
     if missing_wkt:
         warnings.append(
@@ -119,10 +121,10 @@ def validate_excel_zone_consistency(xlsx: Path) -> Tuple[List[str], Dict[str, An
         )
 
     summary: Dict[str, Any] = {
-        "n_rows_raw": int(len(raw)),
-        "n_zones": len(zones_info),
-        "n_polygons_valid": len(polys),
-        "zone_names": sorted(zones_info),
+        "n_rows_raw": int(len(raw)),  # Tamaño del panel
+        "n_zones": len(zones_info),  # Zonas en catálogo
+        "n_polygons_valid": len(polys),  # Polígonos parseables
+        "zone_names": sorted(zones_info),  # Lista ordenada para reproducibilidad
     }
     return warnings, summary
 
@@ -144,14 +146,14 @@ def lat_lon_for_forecast_query(
     Returns:
         (latitude, longitude, fuente) con fuente en ``"wkt_polygon"`` o ``"centroid_fallback"``.
     """
-    geom = polygons.get(zone_name)
+    geom = polygons.get(zone_name)  # None si la zona no tiene polígono cargado
     if geom is not None:
         # Punto robusto dentro del polígono (no siempre el centroide matemático)
         rp = geom.representative_point()
-        lon, lat = float(rp.x), float(rp.y)
-        mapped = zone_for_lon_lat(lon, lat, polygons)
+        lon, lat = float(rp.x), float(rp.y)  # Shapely: x=lon, y=lat
+        mapped = zone_for_lon_lat(lon, lat, polygons)  # Verificar que el punto cae en la zona esperada
         if mapped == zone_name:
-            return lat, lon, "wkt_polygon"
+            return lat, lon, "wkt_polygon"  # Coherencia: el punto representativo pertenece a esta zona
     # Respaldo: coordenadas tabuladas en ZONE_INFO (siempre disponibles por zona)
     lat = float(zone_info_row["LATITUDE_CENTER"])
     lon = float(zone_info_row["LONGITUDE_CENTER"])

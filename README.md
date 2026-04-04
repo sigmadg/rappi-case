@@ -25,7 +25,7 @@ Esta sección resume lo que suele pedir una revisión de **README + entorno + de
 |-------|-----|--------|
 | **Python 3.11+** | Obligatorio | Mismo runtime para M1 (notebook), M2 y M3. |
 | **venv + pip** | Obligatorio (desarrollo local) | `python3 -m venv .venv` y `pip install -r requirements.txt`. |
-| **Docker** | Opcional | **`Dockerfile`**: app en un contenedor. Con Compose: **`./scripts/docker_stack.sh`** (o `docker compose up --build`) añade **Prometheus** y **Grafana** (ver **`docker/README.md`**). |
+| **Docker** | Opcional | **`Dockerfile`**: app en un contenedor. Compose: **`./scripts/docker_stack.sh`** (app + Prometheus + Grafana) o **`./scripts/docker_full_stack.sh`** (lo mismo + **n8n**). Ver **`docker/README.md`**. |
 | **Conda** | Opcional | Si lo usas, crea un env con Python 3.11 e instala `requirements.txt` dentro. |
 | **Jupyter / VS Code + Jupyter** | Módulo 1 | Para ejecutar `01_diagnostico_operacional.ipynb`. |
 | **Ollama** | Opcional (M3) | Solo si `LLM_PROVIDER=ollama` y quieres texto vía modelo local; si no, el agente puede usar **plantilla sin LLM** o **OpenAI**. |
@@ -149,9 +149,10 @@ caso_tecnico/
 ├── django_viz/           # dashboard Django: datos, pipeline, calibración, figuras M1
 ├── docker/               # entrypoint + README del contenedor único
 ├── Dockerfile            # imagen: Django + monitor + POST /tick (puente n8n)
-├── docker-compose.yml    # app + Prometheus + Grafana (./scripts/docker_stack.sh)
+├── docker-compose.yml    # app + Prometheus + Grafana (+ n8n con perfil)
 ├── scripts/docker_up.sh    # Docker sin Compose: solo la app (build + run)
-├── scripts/docker_stack.sh # Docker Compose: app + Prometheus + Grafana
+├── scripts/docker_stack.sh # Compose: app + Prometheus + Grafana
+├── scripts/docker_full_stack.sh # Compose + n8n (perfil n8n)
 ├── scripts/install_docker_compose_plugin.sh  # instala plugin compose desde GitHub (sin apt)
 ├── requirements.txt
 └── .env.example
@@ -170,6 +171,16 @@ Detalle en **`docker/README.md`**. Dos formas:
 ```
 
 Equivale a `docker compose up --build` e imprime las URLs (Django, puente, métricas `:9108`, Prometheus `:9090`, Grafana `:3000`). En segundo plano: `./scripts/docker_stack.sh -d`. Atajo: `./scripts/docker_up.sh stack`.
+
+**Todo lo anterior y además n8n** (orquestación en la misma red Docker):
+
+```bash
+./scripts/docker_full_stack.sh
+```
+
+Equivale a `docker compose --profile n8n up --build`. UI n8n por defecto en **http://127.0.0.1:15678/** (ver `CASO_HOST_N8N`).
+
+**Ollama (LLM)** no forma parte del `docker-compose` del repo: debe ejecutarse en el **host** (p. ej. `OLLAMA_HOST=0.0.0.0 ollama serve`) para que la app lo use vía `host.docker.internal:11434`.
 
 Si un puerto del host está ocupado, usa variables como en el comentario del propio `docker-compose.yml` (p. ej. `CASO_HOST_HTTP`, `CASO_HOST_GRAFANA`, `CASO_HOST_PROMETHEUS`).
 

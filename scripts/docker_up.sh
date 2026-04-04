@@ -66,10 +66,16 @@ for ((i = 0; i < MAX_TRY; i++)); do
   M=$((METRICS_BASE + i))
   if host_port_free "$H" && host_port_free "$B" && host_port_free "$M"; then
     echo "[docker_up] run → ${NAME}"
-    echo "[docker_up] Dashboard: http://127.0.0.1:${H}/"
+    echo ""
+    echo "  ════════════════════════════════════════════════════════════"
+    echo "  FRONT (Django):  http://127.0.0.1:${H}/"
+    echo "  ════════════════════════════════════════════════════════════"
+    echo ""
     echo "[docker_up] Puente n8n:  http://127.0.0.1:${B}/tick"
     echo "[docker_up] Métricas monitor: http://127.0.0.1:${M}/metrics"
     echo "[docker_up] Ollama (LLM en el host): OLLAMA_BASE_URL=${CASO_OLLAMA_URL} — en el host suele hacer falta OLLAMA_HOST=0.0.0.0"
+    echo "[docker_up] Si el navegador dice «Connection failed»: usa **http** (no https), **127.0.0.1** (no «localhost» si falla), y el puerto ${H} de arriba."
+    echo "[docker_up] Comprueba: curl -sS -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:${H}/"
     exec docker run --rm --name "${NAME}" \
       --add-host=host.docker.internal:host-gateway \
       -p "${H}:8000" \
@@ -80,6 +86,7 @@ for ((i = 0; i < MAX_TRY; i++)); do
       "${ENV_FILE_ARGS[@]}" \
       -e "OLLAMA_BASE_URL=${CASO_OLLAMA_URL}" \
       -e "ENABLE_RECALIBRATE_ON_START=${ENABLE_RECALIBRATE_ON_START:-1}" \
+      -e "DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,[::1],*}" \
       "${IMAGE}"
   fi
 done

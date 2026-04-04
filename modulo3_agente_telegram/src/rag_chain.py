@@ -369,9 +369,11 @@ def _ollama_json_rag(context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return parsed  # Dict o None
     except requests.RequestException as e:  # Timeout, conexión rechazada, DNS, etc.
         _LOG.warning(
-            "No se pudo contactar Ollama en %s (%s). Si corres el stack en Docker y Ollama en el host, "
-            "pon OLLAMA_BASE_URL=http://host.docker.internal:11434 en .env y arranca Ollama con "
-            "OLLAMA_HOST=0.0.0.0 para que escuche fuera de localhost.",
+            "No se pudo contactar Ollama en %s (%s). "
+            "Si la app va en Docker y la URL ya es host.docker.internal pero ves «Connection refused», "
+            "Ollama en el host no está escuchando en una interfaz alcanzable desde Docker: arráncalo con "
+            "OLLAMA_HOST=0.0.0.0 (p. ej. `OLLAMA_HOST=0.0.0.0 ollama serve` o variable en systemd/servicio). "
+            "En el host comprueba: curl -sS http://127.0.0.1:11434/api/version",
             base,
             e,
         )

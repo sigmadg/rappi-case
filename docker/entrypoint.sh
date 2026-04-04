@@ -20,10 +20,13 @@ export PYTHONPATH="/app/modulo3_agente_telegram/src:/app/modulo2_motor_alertas/s
 
 python django_viz/manage.py migrate --noinput
 
-# Regenera calibration.json desde RAW_DATA del Excel (misma lógica que M1 / run_alert_engine --recalibrate).
+# Recalibración: antes bloqueaba aquí y Django no abría :8000 hasta terminar (Excel + statsmodels → minutos).
+# En segundo plano: el front y el puente responden al instante; la imagen ya trae un calibration.json usable.
 if [[ "${ENABLE_RECALIBRATE_ON_START:-1}" == "1" ]]; then
-  echo "[docker] Recalibración: data/rappi_delivery_case_data.xlsx → modulo2_motor_alertas/calibration.json"
-  python modulo2_motor_alertas/export_calibration_from_m1.py
+  (
+    echo "[docker] Recalibración en segundo plano: data/rappi_delivery_case_data.xlsx → calibration.json (puede tardar)…"
+    python modulo2_motor_alertas/export_calibration_from_m1.py && echo "[docker] Recalibración terminada."
+  ) &
 fi
 
 pids=()
@@ -40,6 +43,13 @@ if [[ "${ENABLE_N8N_BRIDGE:-1}" == "1" ]]; then
   python -m uvicorn n8n_bridge.app:app --host 0.0.0.0 --port 8090 &
   pids+=($!)
 fi
+
+# Django **antes** de M2/M3: el monitor hace ticks Open-Meteo + pipeline y puede competir por CPU/red al arrancar;
+# así :8000 empieza a aceptar conexiones cuanto antes.
+echo "[docker] Django (front) → 0.0.0.0:8000 — en el host: http://127.0.0.1:PUERTO_MAPEADO/"
+python django_viz/manage.py runserver 0.0.0.0:8000 &
+DJANGO_PID=$!
+pids+=("${DJANGO_PID}")
 
 # Módulo 2: motor de alertas en consola/auditoría (estado debounce distinto al del monitor M3).
 if [[ "${ENABLE_M2_ENGINE_LOOP:-1}" == "1" ]]; then
@@ -65,8 +75,5 @@ if [[ "${ENABLE_MONITOR:-1}" == "1" ]]; then
   pids+=($!)
 fi
 
-echo "[docker] Django → 0.0.0.0:8000"
-python django_viz/manage.py runserver 0.0.0.0:8000 &
-pids+=($!)
-
-wait "${pids[-1]}"
+# Proceso que mantiene el contenedor en marcha (si Django muere, termina el entrypoint).
+wait "${DJANGO_PID}"

@@ -2,7 +2,7 @@
 
 **Stack completo (app + Prometheus + Grafana):** desde la raíz del repo, **`./scripts/docker_stack.sh`** o **`./scripts/docker_up.sh stack`** (equivale a `docker compose up --build`). **Solo la app** (sin Grafana): **`./scripts/docker_up.sh`** — si usas este último, **Grafana no existe** en ese arranque.
 
-La imagen principal usa un solo proceso de orquestación (`docker/entrypoint.sh`, con **tini** como PID 1). Tras `migrate`, si `ENABLE_RECALIBRATE_ON_START=1` (default), ejecuta **`export_calibration_from_m1.py`** contra el Excel montado en `data/`, y escribe `modulo2_motor_alertas/calibration.json` antes de arrancar el puente, el bucle M2 y el monitor. Luego levanta:
+La imagen principal usa un solo proceso de orquestación (`docker/entrypoint.sh`, con **tini** como PID 1). Tras `migrate`, si `ENABLE_RECALIBRATE_ON_START=1` (default), la recalibración corre **en segundo plano** mientras suben el puente, los bucles M2/M3 y **Django** (el front no espera a que termine el Excel/statsmodels). Luego levanta:
 
 | Servicio | Puerto | Descripción |
 |----------|--------|-------------|
@@ -75,6 +75,28 @@ Levanta **caso-tecnico**, **Prometheus** y **Grafana**. URLs típicas en el host
 - Métricas del puente (tras un `POST /tick`): <http://127.0.0.1:8090/metrics>
 
 Tras entrar en Grafana (**Dashboards** → carpeta **Caso tecnico Rappi** → **Rappi — operación (ticks monitor y puente)**) deberías ver targets UP y series `rappi_operational_tick_total`. Si **up** sale 0 (DOWN), en Prometheus (**Status → Targets**) revisa errores de conexión a `caso-tecnico:8090` o `:9108` (red Docker o contenedor app caído).
+
+### Script de diagnóstico del front
+
+Desde la raíz del repo:
+
+```bash
+./scripts/status_front.sh
+```
+
+Comprueba que estás en la carpeta correcta, que `caso-tecnico` está **Up** en Compose y hace un `curl` al puerto `CASO_HOST_HTTP` (por defecto 8000).
+
+### Django / front: «Connection failed» en el navegador
+
+Eso es **fallo de conexión TCP** (no llega a Django). Revisa en orden:
+
+1. **URL exacta:** debe ser **`http://`** (no `https://` — el `runserver` no usa TLS; con https el navegador muestra error de conexión).
+2. **IPv6:** abre **`http://127.0.0.1:PUERTO/`** en lugar de `http://localhost:...`. En muchos Linux, `localhost` resuelve a `::1` y el mapeo Docker del host a veces **solo escucha IPv4** → conexión rechazada.
+3. **Puerto:** con **`./scripts/docker_up.sh`**, si 8000 está ocupado el script usa **8001, 8002, …** y lo imprime en consola; no uses 8000 a ciegas.
+4. **Compose:** si usas `CASO_HOST_HTTP=8001`, el front está en **8001**.
+5. **Prueba rápida:** `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/` (cambia el puerto). `200` o `302` = el servicio responde.
+
+Si en cambio ves **página de Django “DisallowedHost”** (400), amplía `DJANGO_ALLOWED_HOSTS` en `.env` o en `docker-compose.yml` (el stack ya incluye `[::1]` y `*` por defecto en desarrollo).
 
 ### Grafana “no funciona” o no abre
 
@@ -183,9 +205,15 @@ Dentro del contenedor, `127.0.0.1:11434` **no** es tu PC. Por eso el stack ya co
 
 **Pasos en el anfitrión**
 
-1. Arranca Ollama escuchando en todas las interfaces (si no, Docker no conecta): p. ej. `OLLAMA_HOST=0.0.0.0` antes de `ollama serve` (detalle en la [FAQ de Ollama](https://github.com/ollama/ollama/blob/main/docs/faq.md) de tu versión).
-2. `ollama pull <OLLAMA_MODEL>` con el mismo nombre que en `.env`.
-3. Opcional: si Ollama no está en el puerto 11434 del host, define `CASO_OLLAMA_URL` en el entorno o en el `.env` que lee Compose (solo afecta la sustitución en `docker-compose.yml`; para `docker_up.sh` exporta la variable antes de ejecutar el script).
+1. Arranca Ollama escuchando en **todas** las interfaces. Si omites esto, suele escuchar solo en `127.0.0.1` y desde el contenedor verás **`Connection refused`** aunque `OLLAMA_BASE_URL` sea correcta.
+   - **Persistente con systemd** (recomendado): desde la raíz del repo,  
+     `sudo ./scripts/ollama_listen_all_interfaces.sh`  
+     (crea `/etc/systemd/system/ollama.service.d/override.conf` y reinicia `ollama`).
+   - **Solo una sesión:** `OLLAMA_HOST=0.0.0.0 ollama serve` (para el segundo proceso, antes para el que ya usa 11434: `sudo systemctl stop ollama`).
+   - Manual: `sudo systemctl edit ollama` y en `[Service]` añade `Environment="OLLAMA_HOST=0.0.0.0"`, luego `sudo systemctl daemon-reload && sudo systemctl restart ollama`. Ver [FAQ Ollama](https://github.com/ollama/ollama/blob/main/docs/faq.md).
+2. En el **host**, comprueba que responde: `curl -sS http://127.0.0.1:11434/api/version`
+3. `ollama pull <OLLAMA_MODEL>` con el mismo nombre que en `.env`.
+4. Opcional: si Ollama no está en el puerto 11434 del host, define `CASO_OLLAMA_URL` en el entorno o en el `.env` que lee Compose (solo afecta la sustitución en `docker-compose.yml`; para `docker_up.sh` exporta la variable antes de ejecutar el script).
 
 Puedes dejar en `.env` `OLLAMA_BASE_URL=http://127.0.0.1:11434` para cuando corres Python en local; Docker **sobrescribe** `OLLAMA_BASE_URL` en el contenedor con el valor anterior.
 

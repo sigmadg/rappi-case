@@ -2,6 +2,33 @@
 
 El **motor de reglas (M2), debounce, LLM y Telegram** siguen en Python (`pipeline_core`, `run_agent`, `monitor_loop`). Aquí se clona el **flujo**: *disparo periódico → misma pasada operativa*.
 
+### Si el nodo HTTP falla (“connection refused”, timeout, ECONNREFUSED)
+
+1. **El puente `/tick` tiene que estar levantado** (proceso `uvicorn` en el puerto publicado, p. ej. 8090).
+2. **La URL del nodo debe alcanzar ese proceso** según dónde corre n8n:
+   - **Recomendado (Docker):** desde la raíz del repo, misma red que la app:
+     ```bash
+     docker compose --profile n8n up --build
+     ```
+     En el nodo HTTP, URL = **`http://caso-tecnico:8090/tick`** (o deja la expresión del JSON si tu n8n ve la variable de entorno `CASO_TICK_URL` que inyecta Compose).
+   - **n8n en Docker pero Compose “solo n8n”** (`n8n/docker-compose.yml`): URL = **`http://host.docker.internal:8090/tick`** (no uses `127.0.0.1` dentro del contenedor).
+   - **n8n con npm en tu PC** y puente en el host: **`http://127.0.0.1:8090/tick`**.
+3. Prueba en terminal: `curl -sS -X POST 'http://127.0.0.1:8090/tick?dry_run=true'` (ajusta puerto si usas `CASO_HOST_BRIDGE`).
+
+### Puerto 5678 ocupado al levantar `n8n` en Compose
+
+El stack del repo mapea la UI de n8n al host en **`CASO_HOST_N8N` (por defecto `15678`)** para no chocar con otra instancia que ya use **5678** (npm u otro contenedor). Abre el editor en **http://127.0.0.1:15678** (o el puerto que definas). Eso **no** es el endpoint del pipeline: el **POST /tick** sigue siendo **`http://caso-tecnico:8090/tick`** dentro del workflow.
+
+### Tabla rápida: qué URL poner en el nodo HTTP
+
+| Dónde corre n8n | Dónde está el puente `/tick` | URL en el nodo |
+|-----------------|-------------------------------|----------------|
+| Contenedor, **mismo** `docker compose --profile n8n` que la app | Servicio `caso-tecnico` | **`http://caso-tecnico:8090/tick`** (es el valor por defecto del workflow importado) |
+| Contenedor, **otro** compose (solo `n8n/docker-compose.yml`) | App publicada en el host (p. ej. `8090→8090`) | **`http://host.docker.internal:8090/tick`** (o el puerto host si mapeaste `8091:8090`) |
+| **npm** en tu máquina | `uvicorn` / Docker publicando 8090 en el host | **`http://127.0.0.1:8090/tick`** |
+
+Si el workflow seguía fallando, suele ser porque el fallback era `127.0.0.1` **dentro** del contenedor n8n: mal. El JSON del repo ya usa **`caso-tecnico`** como fallback cuando no hay `CASO_TICK_URL` en expresiones.
+
 ### Importar **un** workflow principal (recomendado)
 
 | Archivo | Uso |
@@ -52,6 +79,12 @@ Atajo (mismo efecto que el `uvicorn` de arriba):
 
 ```bash
 ./scripts/run_n8n_bridge.sh
+```
+
+Para **n8n en Docker (Linux)** apuntando al puente en el host, el script debe escuchar en todas las interfaces:
+
+```bash
+N8N_BRIDGE_HOST=0.0.0.0 ./scripts/run_n8n_bridge.sh
 ```
 
 - Desde el **mismo host** (n8n instalado con npm en tu PC): en el workflow HTTP usa `http://127.0.0.1:8090/tick`.

@@ -1,9 +1,18 @@
 # Caso técnico: app (Django + monitor + puente /tick) + Prometheus + Grafana.
-# Uso: ./scripts/docker_stack.sh   o   docker compose up --build
+# Uso:
+#   ./scripts/docker_stack.sh           → app + Prometheus + Grafana (sin n8n)
+#   ./scripts/docker_full_stack.sh      → lo anterior + n8n (perfil n8n)
+#   docker compose --profile n8n up --build   (equivalente manual al full stack)
 # Si 8000/8090/9108 del host están ocupados:
 #   CASO_HOST_HTTP=8001 CASO_HOST_BRIDGE=8091 CASO_HOST_METRICS=9109 docker compose up --build
 # Requisitos: data/rappi_delivery_case_data.xlsx
 # Opcional: cp .env.example .env y descomenta la línea .env abajo (Telegram / OpenAI).
+#
+# n8n en la misma red que la app (recomendado; evita host.docker.internal):
+#   docker compose --profile n8n up --build
+# UI en el navegador: http://127.0.0.1:15678  (puerto HOST por defecto; el 5678 choca con otras instancias n8n).
+#   Otro puerto: CASO_HOST_N8N=5679 docker compose --profile n8n up --build
+# El workflow HTTP del canvas NO usa localhost:5678: el POST va a http://caso-tecnico:8090/tick (red Docker).
 
 services:
   caso-tecnico:
@@ -20,7 +29,8 @@ services:
       - ./data:/app/data:ro
       - ./.env:/app/.env:ro
     environment:
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}
+      # Incluye [::1] por si el navegador resuelve localhost → IPv6; * solo desarrollo (acceso por IP LAN).
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,[::1],*}
       MONITOR_DRY_RUN: ${MONITOR_DRY_RUN:-1}
       MONITOR_INTERVAL_SEC: ${MONITOR_INTERVAL_SEC:-600}
       ENABLE_M2_ENGINE_LOOP: ${ENABLE_M2_ENGINE_LOOP:-1}
@@ -33,6 +43,16 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-mixtral:8x7b-instruct-v0.1-q4_0}
       OLLAMA_TIMEOUT_SEC: ${OLLAMA_TIMEOUT_SEC:-180}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5).read(8)\"",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
   prometheus:
     image: prom/prometheus:v2.53.0
@@ -72,3 +92,22 @@ services:
       timeout: 5s
       retries: 6
       start_period: 45s
+
+  n8n:
+    profiles: ["n8n"]
+    image: docker.n8n.io/n8nio/n8n
+    ports:
+      - "${CASO_HOST_N8N:-15678}:5678"
+    environment:
+      N8N_HOST: 0.0.0.0
+      N8N_PORT: 5678
+      TZ: America/Monterrey
+      # Misma red Docker que el servicio caso-tecnico → resuelve el hostname del servicio.
+      CASO_TICK_URL: ${CASO_TICK_URL:-http://caso-tecnico:8090/tick}
+    depends_on:
+      - caso-tecnico
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  n8n_data:

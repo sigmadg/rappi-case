@@ -1,54 +1,7 @@
 % Figuras y tablas M1 (notebook 01_diagnostico_operacional.ipynb) — incluido desde presentacion_demo.tex
 % Rutas relativas al directorio demo_caso_tecnico/
 
-\subsection{Panel: números descriptivos}
 
-\begin{frame}{Resumen numérico — \texttt{describe}}
-  \centering
-  \renewcommand{\arraystretch}{1.35}
-  {\normalsize
-  \begin{tabular}{@{}lrrrr@{}}
-    \toprule
-    & \texttt{HOUR} & \texttt{ratio} & \texttt{PRECIPITATION\_MM} & \texttt{EARNINGS} \\
-    \midrule
-    count & 10080{,}0000 & 10080{,}0000 & 10080{,}0000 & 10080{,}0000 \\
-    mean  & 11{,}5000 & 0{,}8179 & 0{,}2467 & 57{,}6961 \\
-    std   & 6{,}9225 & 0{,}5509 & 1{,}2650 & 8{,}2928 \\
-    min   & 0{,}0000 & 0{,}0000 & 0{,}0000 & 49{,}0000 \\
-    25\%  & 5{,}7500 & 0{,}5000 & 0{,}0000 & 52{,}4000 \\
-    50\%  & 11{,}5000 & 0{,}8000 & 0{,}0000 & 55{,}6000 \\
-    75\%  & 17{,}2500 & 1{,}0968 & 0{,}0000 & 58{,}7000 \\
-    max   & 23{,}0000 & 5{,}6667 & 10{,}3000 & 97{,}0000 \\
-    \bottomrule
-  \end{tabular}
-  }
-
-  \vspace{0.55em}
-  \footnotesize
-  \textbf{Nota:} si \texttt{CONNECTED\_RT}${}=0$, \texttt{ratio} es NaN y no cuenta en \texttt{describe}; en este panel las cuatro columnas muestran \texttt{count}${}=10\,080$.
-\end{frame}
-
-\begin{frame}{Cobertura del panel}
-  \centering
-  \renewcommand{\arraystretch}{1.35}
-  {\normalsize
-  \begin{tabular}{@{}lr@{}}
-    \toprule
-    \textbf{Métrica} & \textbf{Valor} \\
-    \midrule
-    Filas totales (observaciones en el extracto) & 10\,080 \\
-    Zonas distintas (\texttt{ZONE}) & 14 \\
-    Horas distintas (\texttt{HOUR}) & 24 \\
-    Sin clasificación operativa (\texttt{ratio} NaN, sin etiqueta) & 0 \\
-    \bottomrule
-  \end{tabular}
-  }
-
-  \vspace{0.75em}
-  {\normalsize
-  Estructura nominal del caso: \textbf{30 días $\times$ 24 h $\times$ 14 zonas} $= 10\,080$ celdas, alineado con el Excel de referencia.
-  }
-\end{frame}
 
 \begin{frame}{Clasificación operativa — conteos y \% (sobre filas con etiqueta)}
   \begingroup
@@ -78,7 +31,7 @@
   \end{piegrafica}
 \end{frame}
 
-\subsection{Saturación por hora y por zona (P1)}
+
 
 \begin{frame}{P1 — Saturación por hora del día}
   \begingroup
@@ -114,9 +67,6 @@
   \end{tabular}
   \par
   \endgroup
-  \begin{piegraficafoot}
-  Salida del notebook (bloque 3c): fracción de filas en saturación por hora, ordenadas; $n=420$ celdas por hora en el panel balanceado.
-  \end{piegraficafoot}
 \end{frame}
 
 \begin{frame}{P1 — Zonas con más celdas en saturación}
@@ -130,7 +80,6 @@
   \end{piegrafica}
 \end{frame}
 
-\subsection{Precipitación: correlación, MCO y diagnósticos (P2)}
 
 \begin{frame}[t]{P2 — Correlaciones Pearson y MCO}
   \begingroup
@@ -156,97 +105,10 @@
   \footnotesize
   \raggedright
   \noindent
-  \textbf{Modelo:} \texttt{ratio} $\sim$ \texttt{PRECIPITATION\_MM} + \texttt{C(HOUR)} + \texttt{C(ZONE)} + \texttt{C(dow)}\\[0.2em]
-  Coef.\ \texttt{PRECIPITATION\_MM}: $0{,}080244$ \quad p-valor (MCO clásico): $\approx 2{,}1\times 10^{-231}$\\[0.1em]
-  IC95\% coef.\ precipitación: $[0{,}075527,\,0{,}084960]$ \quad $R^2 = 0{,}7180$ \quad $n = 10\,080$\\[0.25em]
   $P(\text{saturación} \mid \text{precip} > 0{,}5) = 0{,}3082$ \quad
   $P(\text{saturación} \mid \text{precip} \le 0{,}5) = 0{,}0377$\\[0.25em]
-  \textbf{MCO con SE cluster (zona):} $\beta_{\text{precip}} = 0{,}080244$ \quad SE${}= 0{,}010357$ \quad $p = 9{,}37\times 10^{-15}$ \quad IC95\%: $[0{,}059944,\,0{,}100544]$
   \par
   \endgroup
-
-  \begin{piegrafica}
-  Primero la \textbf{correlación de Pearson} (asociación lineal simple). Luego el \textbf{MCO} con controles: el coeficiente de lluvia es \textbf{marginal condicionado} a hora, zona y día.
-
-  Eso reduce confusión por patrones semanales, pero \textbf{no} prueba causalidad por sí solo.
-  \end{piegrafica}
-\end{frame}
-
-\begin{frame}{P2 — Resumen numérico del ajuste OLS}
-  \begingroup
-  \footnotesize
-  \centering
-  \renewcommand{\arraystretch}{1.2}
-  \begin{tabular}{@{}lr@{}}
-    \toprule
-    \textbf{Métrica} & \textbf{Valor} \\
-    \midrule
-    Modelo & OLS \\
-    Variable dependiente & \texttt{ratio} \\
-    $R^2$ & 0{,}718 \\
-    $R^2$ ajustado & 0{,}717 \\
-    Observaciones & 10\,080 \\
-    Grados de libertad (modelo / residuos) & 43 / 10\,036 \\
-    Estadístico $F$ & 594{,}1 \\
-    $\Pr(>F)$ & $\approx 0$ \\
-    AIC & 3916{,}2816 \\
-    BIC & 4233{,}8871 \\
-    Log-verosimilitud & $-1914{,}1$ \\
-    Escala (\texttt{Scale}) & 0{,}085974 \\
-    \bottomrule
-  \end{tabular}
-  \par
-  \endgroup
-
-  \begin{piegrafica}
-  Resumen del ajuste global del MCO principal: $F$ muy grande y $R^2$ alto indican que hora, zona, día y lluvia explican buena parte de la variación del \texttt{ratio} en este panel.
-
-  Es una lectura descriptiva del modelo, no inferencia causal.
-  \end{piegrafica}
-\end{frame}
-
-\begin{frame}{P2 — Diagnóstico MCO (1/4) — Residuos vs ajustados}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p2_ols_diagnostico_separados/p2_ols_residuals_vs_fitted.png}
-  \par
-  \endgroup
-  \begin{piegrafica}
-  Busca patrones sistemáticos (curvas, abanicos). Si el modelo captura bien la media condicional, la nube debería verse razonablemente aleatoria alrededor de cero.
-  \end{piegrafica}
-\end{frame}
-
-\begin{frame}{P2 — Diagnóstico MCO (2/4) — QQ de residuos}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p2_ols_diagnostico_separados/p2_ols_qq_residuals.png}
-  \par
-  \endgroup
-  \begin{piegrafica}
-  Compara la cola de los residuos con la normal. Desviaciones fuertes sugieren colas pesadas o valores atípicos que el modelo lineal no absorbe bien.
-  \end{piegrafica}
-\end{frame}
-
-\begin{frame}{P2 — Diagnóstico MCO (3/4) — Regresión parcial (lluvia)}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p2_ols_diagnostico_separados/p2_ols_partial_precip.png}
-  \par
-  \endgroup
-  \begin{piegrafica}
-  Relación entre lluvia y ratio \emph{después} de quitar hora, zona y día de la semana: idea de ``pendiente neta'' de precipitación.
-  \end{piegrafica}
-\end{frame}
-
-\begin{frame}{P2 — Diagnóstico MCO (4/4) — Observado vs ajustado}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p2_ols_diagnostico_separados/p2_ols_observed_vs_fitted.png}
-  \par
-  \endgroup
-  \begin{piegrafica}
-  Mide qué tan bien el ajuste reproduce el nivel de \texttt{ratio}. Los puntos muy alejados de la diagonal indican celdas mal explicadas por el modelo.
-  \end{piegrafica}
 \end{frame}
 
 \begin{frame}{P2 — Lluvia, demanda e interacción (lectura cualitativa)}
@@ -273,42 +135,15 @@
   \end{piegraficafoot}
 \end{frame}
 
-\subsection{Exploración, GAP1 y tramos de \texttt{ratio} (P2b)}
 
 \begin{frame}{Exploración — distribución del \texttt{ratio} por zona}
   \begingroup
   \centering
-  \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../modulo1_diagnostico/figures/exploracion_ratio_por_zona.png}
+  \includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{../modulo1_diagnostico/figures/exploracion_ratio_por_zona.png}
   \par
   \endgroup
-  \begin{piegrafica}
-  Panorama antes de profundizar: cómo se distribuye el \texttt{ratio} y cómo se compara \textbf{entre zonas} (mediana, dispersión, colas).
-  \end{piegrafica}
 \end{frame}
 
-\begin{frame}{GAP 1 — Contraste ANOVA (lluvia $\times$ hora)}
-  \begingroup
-  \footnotesize
-  \centering
-  \renewcommand{\arraystretch}{1.2}
-  \begin{tabular}{@{}lrr@{}}
-    \toprule
-    \textbf{Modelo} & $R^2$ & $R^2$ adj. \\
-    \midrule
-    Aditivo (\texttt{precip} + hora + zona + \texttt{dow}) & $0{,}7180$ & $0{,}7168$ \\
-    Con interacción \texttt{precip}$\times$\texttt{HOUR} & $0{,}7288$ & $0{,}7271$ \\
-    \bottomrule
-  \end{tabular}
-
-  \vspace{0.4em}
-  \textbf{Contraste de modelos anidados} (mismas $n=10\,080$): $F \approx 23{,}47$, $\Pr(>F) \approx 1{,}1\times 10^{-72}$.
-  \par
-  \endgroup
-
-  \begin{piegrafica}
-  La interacción lluvia$\times$hora mejora el ajuste de forma \textbf{estadísticamente muy fuerte}: el efecto de la lluvia sobre el \texttt{ratio} \emph{cambia} según la hora (heterogeneidad horaria).
-  \end{piegrafica}
-\end{frame}
 
 \begin{frame}{GAP 1 — Pendiente marginal de precipitación por hora}
   \begingroup
@@ -318,56 +153,9 @@
   \endgroup
   \begin{piegrafica}
   Con interacción precipitación$\times$hora, la \textbf{pendiente marginal} de +1~mm/h varía por franja. El gráfico resume $\Delta\text{ratio}$ por hora (referencia \texttt{HOUR}=0).
-
-  Frase tipo negocio (notebook): a las 14:00, +1~mm/h se asocia a $\approx +0{,}178$ en \texttt{ratio} (lectura asociativa).
   \end{piegrafica}
 \end{frame}
 
-\begin{frame}[t]{GAP 1 — Tabla: $\Delta$\texttt{ratio} por +1~mm/h (horas 0--11)}
-  \begingroup
-  \centering
-  \small
-  \renewcommand{\arraystretch}{1.12}
-  \begin{tabular}{@{}lrrrrrr@{}}
-    \toprule
-    \texttt{HOUR} & 0 & 1 & 2 & 3 & 4 & 5 \\
-    \midrule
-    $\Delta$\texttt{ratio} & $-0{,}117$ & $+0{,}031$ & $+0{,}092$ & $-0{,}117$ & $-0{,}117$ & $-0{,}117$ \\
-    \midrule
-    \texttt{HOUR} & 6 & 7 & 8 & 9 & 10 & 11 \\
-    \midrule
-    $\Delta$\texttt{ratio} & $-0{,}040$ & $-0{,}117$ & $-0{,}016$ & $-0{,}117$ & $-0{,}071$ & $-0{,}039$ \\
-    \bottomrule
-  \end{tabular}
-  \par
-  \endgroup
-  \begin{piegraficafoot}
-  Valores del MCO con interacción precipitación$\times$\texttt{HOUR} (\texttt{HOUR}${}=0$ referencia). Mismos números que imprime el notebook.
-  \end{piegraficafoot}
-\end{frame}
-
-\begin{frame}[t]{GAP 1 — Tabla: $\Delta$\texttt{ratio} por +1~mm/h (horas 12--23)}
-  \begingroup
-  \centering
-  \small
-  \renewcommand{\arraystretch}{1.12}
-  \begin{tabular}{@{}lrrrrrr@{}}
-    \toprule
-    \texttt{HOUR} & 12 & 13 & 14 & 15 & 16 & 17 \\
-    \midrule
-    $\Delta$\texttt{ratio} & $+0{,}128$ & $+0{,}129$ & $+0{,}178$ & $+0{,}131$ & $+0{,}092$ & $+0{,}074$ \\
-    \midrule
-    \texttt{HOUR} & 18 & 19 & 20 & 21 & 22 & 23 \\
-    \midrule
-    $\Delta$\texttt{ratio} & $+0{,}089$ & $+0{,}105$ & $+0{,}060$ & $+0{,}038$ & $-0{,}002$ & $-0{,}117$ \\
-    \bottomrule
-  \end{tabular}
-  \par
-  \endgroup
-  \begin{piegraficafoot}
-  Pico marginal estimado en la hora \textbf{14} del panel; varias horas comparten el coeficiente de referencia ($-0{,}117$) por construcción del modelo.
-  \end{piegraficafoot}
-\end{frame}
 
 \begin{frame}{P2b — Tabla: saturación y CV(\texttt{ORDERS}) por tramo de \texttt{ratio}}
   \begingroup
@@ -404,7 +192,6 @@
   \end{piegrafica}
 \end{frame}
 
-\subsection{Sensibilidad por zona, riesgo y agregados (P3--GAP5)}
 
 \begin{frame}{P3 — Coef.\ precipitación por zona (MCO estratificado, 14 zonas)}
   \begingroup
@@ -463,69 +250,45 @@
   \end{piegrafica}
 \end{frame}
 
-\begin{frame}{P4 — Top 10 días por fracción en saturación (\texttt{sat\_frac})}
+\begin{frame}{P4 — Top 10 días por \texttt{sat\_frac}}
   \begingroup
   \centering
   \scriptsize
   \renewcommand{\arraystretch}{1.05}
-  \begin{tabular}{@{}lrrrr@{}}
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{@{}lrrrr>{\raggedright\arraybackslash}p{0.42\linewidth}@{}}
     \toprule
-    \textbf{Fecha} & earn.\ med. & \texttt{sat\_frac} & \texttt{sobre\_frac} & \texttt{ratio} med. \\
+    \textbf{Fecha} & \shortstack{earn.\\med.} & \texttt{sat\_frac} & \texttt{sobre\_frac} & \shortstack{\texttt{ratio}\\med.} & \textbf{A investigar (hip.\ ext.)} \\
     \midrule
-    2024-03-28 & $55{,}86$ & $0{,}1667$ & $0{,}1994$ & $1{,}103$ \\
-    2024-03-08 & $56{,}22$ & $0{,}1399$ & $0{,}2173$ & $0{,}976$ \\
-    2024-03-25 & $56{,}07$ & $0{,}1310$ & $0{,}2143$ & $0{,}896$ \\
-    2024-03-05 & $57{,}17$ & $0{,}0952$ & $0{,}2054$ & $0{,}980$ \\
-    2024-03-27 & $56{,}66$ & $0{,}0655$ & $0{,}2143$ & $0{,}809$ \\
-    2024-03-14 & $60{,}44$ & $0{,}0506$ & $0{,}2798$ & $0{,}746$ \\
-    2024-03-16 & $57{,}17$ & $0{,}0506$ & $0{,}2202$ & $0{,}800$ \\
-    2024-03-01 & $56{,}59$ & $0{,}0476$ & $0{,}1964$ & $0{,}831$ \\
-    2024-03-18 & $56{,}64$ & $0{,}0446$ & $0{,}2024$ & $0{,}814$ \\
-    2024-03-26 & $56{,}55$ & $0{,}0446$ & $0{,}2173$ & $0{,}817$ \\
+    2024-03-28 & $55{,}86$ & $0{,}1667$ & $0{,}1994$ & $1{,}103$ &
+      Placebo (Showcenter), The Vaccines (GNP). \\
+    2024-03-08 & $56{,}22$ & $0{,}1399$ & $0{,}2173$ & $0{,}976$ &
+      Neblina, Tour ``90s Pop'' (Arena), 8M \\
+    2024-03-25 & $56{,}07$ & $0{,}1310$ & $0{,}2143$ & $0{,}896$ &
+      Sin feriado\\
+    2024-03-05 & $57{,}17$ & $0{,}0952$ & $0{,}2054$ & $0{,}980$ &
+      Sin feriado. \\
+    2024-03-27 & $56{,}66$ & $0{,}0655$ & $0{,}2143$ & $0{,}809$ &
+      Sin eventos destacados. Sin feriado. \\
+    2024-03-14 & $60{,}44$ & $0{,}0506$ & $0{,}2798$ & $0{,}746$ &
+      Portugal. (Showcenter); Ana Bárbara (Arena).  \\
+    2024-03-16 & $57{,}17$ & $0{,}0506$ & $0{,}2202$ & $0{,}800$ &
+      Tucanes de Tijuana (Arena). \\
+    2024-03-01 & $56{,}59$ & $0{,}0476$ & $0{,}1964$ & $0{,}831$ &
+      Camilo Séptimo (Showcenter); Temerarios (Arena); \\
+    2024-03-18 & $56{,}64$ & $0{,}0446$ & $0{,}2024$ & $0{,}814$ &
+       Natalicio Benito Juárez, Laura Pausini (Arena). \\
+    2024-03-26 & $56{,}55$ & $0{,}0446$ & $0{,}2173$ & $0{,}817$ &
+      Sin feriado. \\
     \bottomrule
   \end{tabular}
   \par
   \endgroup
   \begin{piegraficafoot}
-  Agregación diaria del notebook. \textbf{p75 earn + p75 estrés:} solo 2024-03-14. \textbf{p75 earn + p75 sobre-oferta:} 2024-03-03, 07, 14, 22 (detalle en consola del notebook).
+  Notebook: \textbf{p75 earn + estrés} solo 2024-03-14; \textbf{p75 earn + sobre-oferta} 2024-03-03, 07, 14, 22. Columna \emph{A investigar:} clima, conciertos/eventos y feriados (referencia externa; no está en el Excel del caso).
   \end{piegraficafoot}
 \end{frame}
 
-\begin{frame}{GAP 4 — Horas con mayor $\Delta P(\text{sat})$ (alto $-$ bajo \texttt{EARNINGS}, misma hora)}
-  \begingroup
-  \footnotesize
-  \centering
-  \renewcommand{\arraystretch}{1.12}
-  \begin{tabular}{@{}crrr@{}}
-    \toprule
-    \textbf{Hora} & $P_{\text{sat}}(\ge\text{med.})$ & $P_{\text{sat}}(<\text{med.})$ & \textbf{diff} \\
-    \midrule
-    16 & $0{,}0142$ & $0{,}0000$ & $+0{,}0142$ \\
-    15 & $0{,}0095$ & $0{,}0000$ & $+0{,}0095$ \\
-    18 & $0{,}0095$ & $0{,}0000$ & $+0{,}0095$ \\
-    17 & $0{,}0142$ & $0{,}0048$ & $+0{,}0094$ \\
-    \bottomrule
-  \end{tabular}
-  \par
-  \endgroup
-
-  \begin{piegrafica}
-  Dentro de cada \texttt{HOUR}, se compara saturación entre filas con \texttt{EARNINGS} alto vs bajo (split por mediana en esa hora). Si diff $\approx 0$, el estrés es similar.
-
-  Si diff $\gg 0$, conviene revisar confusores (zona, lluvia) o la mecánica de incentivos.
-  \end{piegrafica}
-\end{frame}
-
-\begin{frame}{GAP 4 — Contraste intra-hora (alto vs bajo \texttt{EARNINGS})}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../modulo1_diagnostico/figures/gap4_p4_counterfactual_misma_hora.png}
-  \par
-  \endgroup
-  \begin{piegrafica}
-  La figura resume por hora la diferencia de probabilidad de saturación entre mitades de incentivo. Complementa la tabla de las horas con mayor contraste positivo.
-  \end{piegrafica}
-\end{frame}
 
 \begin{frame}{GAP 5 — \textit{Risk score} por zona (tabla completa, notebook)}
   \begingroup
@@ -614,68 +377,7 @@
   \end{piegrafica}
 \end{frame}
 
-\begin{frame}{P6 — Reparto de incentivos (pico por zona)}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p6_reparto_incentivos_zonas.png}
-  \par
-  \endgroup
-  \begin{piegrafica}
-  Solución de optimización que prioriza atraer oferta hacia zonas más tensionadas en el instante pico, con pesos de riesgo y probabilidad de saturación.
 
-  No sustituye al motor M2 ni a políticas reales de incentivos.
-  \end{piegrafica}
-\end{frame}
-
-\subsection{Calendario, dispersión exógena y tablas GAP2/3/P5}
-
-\begin{frame}{Calendario — Tests (\texttt{ratio} vs día y festivos MX)}
-  \begingroup
-  \footnotesize
-  \centering
-  \renewcommand{\arraystretch}{1.15}
-  \begin{tabular}{@{}p{0.30\textwidth}p{0.64\textwidth}@{}}
-    \toprule
-    \textbf{Test} & \textbf{Resultado (panel)} \\
-    \midrule
-    Kruskal--Wallis & \texttt{ratio} vs día semana: estad.\ $\approx 6{,}26$, $p \approx 0{,}395$ \\
-    Mann--Whitney   & Festivo vs no festivo: $p \approx 0{,}00185$. \newline $n_{\text{fest}}=1008$, $n_{\text{no}}=9072$ \\
-    Spearman        & \texttt{ratio} vs índice Lun--Dom: $\rho \approx -0{,}0213$, $p \approx 0{,}032$ \\
-    \bottomrule
-  \end{tabular}
-  \par
-  \endgroup
-
-  \begin{piegrafica}
-  El día de la semana no muestra diferencias fuertes en el test global. Los festivos sí se asocian a diferencias de \texttt{ratio} (asociativo).
-
-  El Spearman con índice de día es solo exploratorio.
-  \end{piegrafica}
-\end{frame}
-
-\begin{frame}{Calendario — \texttt{ratio} por día y festivo vs no festivo}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../modulo1_diagnostico/figures/calendario_ratio_dow_festivos.png}
-  \par
-  \endgroup
-  \begin{piegrafica}
-  Boxplots de \texttt{ratio} por día de la semana y comparación festivo / no festivo, coherentes con los contrastes no paramétricos de la lámina anterior.
-  \end{piegrafica}
-\end{frame}
-
-\begin{frame}{Factores exógenos — precipitación del caso vs \texttt{ratio}}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../modulo1_diagnostico/figures/m1_ratio_vs_precipitation_exog_section.png}
-  \par
-  \endgroup
-  \begin{piegrafica}
-  Dispersión \texttt{ratio} vs precipitación del panel; complementa el MCO y extensiones con variables exógenas (temperatura/humedad) cuando existen.
-
-  Spearman precipitación--\texttt{ratio} en panel: $\rho \approx 0{,}2307$.
-  \end{piegrafica}
-\end{frame}
 
 \begin{frame}{P5 — Spearman \texttt{EARNINGS} vs \texttt{ratio} (panel completo)}
   \begingroup
@@ -698,160 +400,4 @@
   \end{piegrafica}
 \end{frame}
 
-\begin{frame}{Tablas — oferta, saturación y P5 (mismos datos que el notebook)}
-  \begingroup
-  \footnotesize
-  \centering
-  \renewcommand{\arraystretch}{1.22}
-  \begin{tabular}{@{}p{0.52\textwidth}r@{}}
-    \toprule
-    \textbf{Resultado (panel 10\,080 celdas)} & \textbf{Valor} \\
-    \midrule
-    \multicolumn{2}{@{}l}{\textit{GAP 2 — Oferta} \quad \texttt{CONNECTED\_RT} $\sim$ \texttt{EARNINGS} + precip.\ + \texttt{C(HOUR)} + \texttt{C(ZONE)}} \\
-    Coef.\ \texttt{EARNINGS} ($+1$ MXN $\to$ $\Delta$ RT, ceteris paribus) & $+0{,}3401$ \\
-    \midrule
-    \multicolumn{2}{@{}l}{\textit{GAP 3 — Logit} \quad $P(\texttt{ratio}>1{,}8)$ $\sim$ precip.\ + \texttt{EARNINGS} + \texttt{C(HOUR)} + \texttt{C(ZONE)}} \\
-    Pseudo $R^2$ (McFadden) & $0{,}700$ \\
-    \midrule
-    \multicolumn{2}{@{}l}{\textit{P5 — Interacción} \quad \texttt{ratio} $\sim$ \texttt{EARNINGS}$\times$\texttt{PRECIPITATION\_MM} + \texttt{C(HOUR)} + \texttt{C(ZONE)}} \\
-    Coef.\ \texttt{EARNINGS:PRECIPITATION\_MM} & $-0{,}001895$ \\
-    $p$-valor (aprox.) & $< 10^{-50}$ \\
-    \bottomrule
-  \end{tabular}
-  \par
-  \endgroup
 
-  \begin{piegrafica}
-  La oferta (\texttt{CONNECTED\_RT}) responde a incentivos y controles. El logit resume probabilidad de saturación con muchos predictores.
-
-  La interacción P5 indica que la pendiente de \texttt{EARNINGS} sobre el \texttt{ratio} \emph{cambia} con la lluvia (asociativo). Números alineados con el Excel y el notebook \texttt{01\_diagnostico\_operacional.ipynb}.
-  \end{piegrafica}
-\end{frame}
-
-\subsection{P1 — Frecuencia por hora (una lámina por zona)}
-
-\begin{frame}{P1 · Apodaca Centro}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__Apodaca_Centro.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · Carretera Nacional}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__Carretera_Nacional.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · Centro}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__Centro.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · Cumbres Poniente}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__Cumbres_Poniente.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · Escobedo}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__Escobedo.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · Independencia}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__Independencia.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · La Fe}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__La_Fe.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · Mitras Centro}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__Mitras_Centro.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · MTY Apodaca Huinalá}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__MTY_Apodaca_Huinalá.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · MTY Guadalupe}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__MTY_Guadalupe.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · San Nicolás}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__San_Nicolás.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · San Pedro}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__San_Pedro.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · Santa Catarina}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__Santa_Catarina.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}
-
-\begin{frame}{P1 · Santiago}
-  \begingroup
-  \centering
-  \includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{../modulo1_diagnostico/figures/p1_frecuencia_por_zona/p1_frecuencia_hora__Santiago.png}
-  \par
-  \endgroup
-  \pizoneread
-\end{frame}

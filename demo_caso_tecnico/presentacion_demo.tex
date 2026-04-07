@@ -8,6 +8,7 @@
 \usepackage[spanish]{babel}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{array}
 \usepackage{xcolor}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,calc}
@@ -23,7 +24,17 @@
 \setbeamercolor{title}{fg=white}
 \setbeamercolor{subtitle}{fg=white!92}
 \setbeamertemplate{navigation symbols}{}
-\setbeamertemplate{footline}{}
+% Numeración: diapositiva actual / total (misma convención que Beamer para handout).
+\setbeamertemplate{footline}{%
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=\paperwidth,ht=2.5ex,dp=1ex,leftskip=1em,rightskip=1em]{author in head/foot}%
+      \usebeamerfont{author in head/foot}%
+      \usebeamercolor[fg]{author in head/foot}%
+      \hfill\insertframenumber\,/\,\inserttotalframenumber
+    \end{beamercolorbox}%
+  }%
+}
 
 \newenvironment{piegrafica}{%
   \par\vspace{0.5em}%
@@ -57,7 +68,7 @@
   \end{piegrafica}%
 }
 
-\title[Sistema de alertas]{Alertas cuando llueve y la operación se aprieta}
+\title[Sistema de alertas]{Alertas cuando llueve y la operación intensifica.}
 \subtitle{Caso Rappi · Datos + reglas por zona + mensaje en Telegram}
 \author{Demo técnica}
 \date{\today}
@@ -78,7 +89,7 @@
 \begin{frame}{Rappi pierde eficiencia por desbalance dinámico}
   \begin{itemize}
     \item La \textbf{oferta} (repartidores conectados) y la \textbf{demanda} (pedidos) \emph{no} se equilibran de forma estable: cambian por \textbf{zona}, \textbf{hora} y \textbf{contexto} (clima, día, incentivos).
-    \item Ese desbalance se manifiesta en colas, saturación puntual y decisiones tarde: hacen falta \textbf{avisos a tiempo} y \textbf{números concretos} (zona, gravedad, cuánto subir incentivos en pesos).
+    \item Ese desbalance se manifiesta en colas, saturación puntual y decisiones tarde: hacen falta \textbf{avisos a tiempo} y \textbf{números concretos} (zona, gravedad, cuánto subir incentivos).
     \item La solución del caso no es un ``modelo mágico'' a ciegas: primero se \textbf{aprende del histórico} (Excel + notebook) y luego el código aplica \textbf{reglas claras} y parámetros versionados (\texttt{calibration.json}).
   \end{itemize}
 \end{frame}
@@ -95,9 +106,6 @@
   \centering
   \includegraphics[width=\linewidth,height=0.80\textheight,keepaspectratio]{figures/pipeline_arquitectura.png}
 
-  \vspace{0.45em}
-  \small
-  El M3 usa el \textbf{mismo motor} que el M2; solo añade redacción y el canal de aviso (Telegram).
 \end{frame}
 
 % ---------------------------------------------------------------------------
@@ -106,8 +114,8 @@
 \begin{frame}{Qué mide el \texttt{ratio} y cómo se etiqueta el panel}
   \begin{itemize}
     \item \textbf{Definición:} \texttt{ratio} $=$ pedidos entre repartidores conectados en esa celda (zona $\times$ hora); resume el \textbf{apretón} operativo relativo.
-    \item \textbf{Saturación (caso):} si el \texttt{ratio} supera \textbf{1{,}8} la celda se trata como saturada en el diagnóstico.
-    \item \textbf{Otras bandas útiles:} sobre-oferta si ${<}\,0{,}5$; ``saludable'' entre $0{,}9$ y $1{,}2$; el resto es intermedio (misma convención que el notebook M1).
+    \item \textbf{Saturación:} si el \texttt{ratio} supera \textbf{1{,}8} la celda se trata como saturada en el diagnóstico.
+    \item \textbf{Otras bandas:} sobre-oferta si ${<}\,0{,}5$; ``saludable'' entre $0{,}9$ y $1{,}2$; el resto es intermedio.
     \item \textbf{Panel:} 30 días $\times$ 24 h $\times$ 14 zonas $=$ 10\,080 filas en el Excel de referencia.
   \end{itemize}
 \end{frame}
@@ -115,16 +123,7 @@
 % ---------------------------------------------------------------------------
 \section{Diagnóstico: zonas y horas críticas}
 
-\begin{frame}{Módulo 1: para qué sirve}
-  \begin{itemize}
-    \item \textbf{Entrada:} el Excel del caso (\texttt{data/rappi\_delivery\_case\_data.xlsx}): pedidos, pagos, lluvia, hora, zona, si la zona iba ``saturada'', etc.
-    \item \textbf{Herramienta:} notebook \texttt{01\_diagnostico\_operacional.ipynb}.
-    \item \textbf{Salida humana:} ver cómo se mueve el \textbf{ratio} (pedidos por repartidor), cuándo hay saturación y cómo se relaciona con la lluvia \textbf{en cada zona}.
-    \item \textbf{Salida para el código:} números que terminan en \texttt{calibration.json} (export desde script o lógica alineada al notebook).
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{Qué se calcula por zona (nombres técnicos)}
+\begin{frame}{Variables que se utilizan para calibrar el motor}
   \small
   \begin{itemize}
     \item \textbf{\texttt{precip\_coef}} — cuánto sube el ``apretón'' operativo cuando sube un poco la lluvia (estimado como en el notebook).
@@ -136,49 +135,27 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Cinco cosas que el diagnóstico deja claras}
+\begin{frame}{Cosas que el diagnóstico deja en claro}
   \footnotesize
   \begin{enumerate}
-    \item El panel tiene \textbf{30 días $\times$ 24 h $\times$ 14 zonas} (10\,080 filas). El \textbf{ratio} es pedidos entre repartidores conectados; ``saturado'' si el ratio pasa de \textbf{1{,}8}.
-    \item La lluvia \textbf{sí se asocia} con más presión operativa (modelo con hora y zona; el notebook muestra un $R^2$ alto en ese ajuste).
+    \item El panel tiene \textbf{30 días $\times$ 24 h $\times$ 14 zonas} (10\,080 filas). 
+    \item La lluvia \textbf{sí se asocia} con más presión operativa.
+    \item Hay una asociación con patrones temporales específicos, en ciertos horarios del día (Comida y Cena).
+    \item Se observan incrementos en días festivos, así como en días particulares de la semana como jueves y martes.
+    \item Existe una posible influencia de eventos locales, que podrían intensificar la demanda y elevar saturación.
     \item Si en una hora hay más de \textbf{0{,}5 mm/h} de lluvia, la probabilidad de saturación es unas \textbf{8 veces} mayor que con lluvia muy suave o nula.
-    \item \textbf{Cada zona es distinta:} por ejemplo Santiago reacciona antes que Mitras; los números en \texttt{calibration.json} lo reflejan.
-    \item \textbf{Mapas:} la mayoría de polígonos vienen bien; donde falta, se usan centroides. Los umbrales de lluvia van \textbf{zona por zona}.
+    \item \textbf{Cada zona es distinta:} por ejemplo Santiago reacciona antes que Mitras.
+    \item \textbf{Mapas:} la mayoría de polígonos vienen bien; donde falta, se usan centroides. 
+    \item Los resultados deben interpretarse con cautela, ya que pueden estar afectados por variables de confusión.
+    \item Es necesario validar si los efectos observados son causales o circunstanciales.
+    \item Se recomienda incorporar variables como el tipo de zona (urbana vs. rural).
   \end{enumerate}
   \vspace{0.25em}
   \tiny Más detalle: \texttt{modulo1\_diagnostico/HALLAZGOS\_M1.md}
 \end{frame}
 
-\begin{frame}{Qué mirar en el diagnóstico (zonas y horas)}
-  \small
-  \begin{itemize}
-    \item \textbf{Horas críticas:} en el notebook, P1 y tablas de $p_{\text{sat}}$ por \texttt{HOUR} muestran dónde se concentra la saturación histórica (p.\,ej.\ comida).
-    \item \textbf{Zonas críticas:} ranking por frecuencia de saturación, \textit{risk score} y sensibilidad a lluvia difieren por territorio (Santiago vs Mitras, etc.).
-    \item \textbf{Granularidad:} el análisis es \textbf{zona $\times$ hora}; agregar solo a día o solo a ciudad mezcla contextos y puede confundir lectura.
-  \end{itemize}
-\end{frame}
-
 \input{presentacion_diagnostico_m1.tex}
 
-\begin{frame}{Documentos y figuras}
-  \begin{itemize}
-    \item Informe en \texttt{modulo1\_diagnostico/Diagnóstico Operacional/}.
-    \item Gráficos del notebook en \texttt{modulo1\_diagnostico/figures/}.
-    \item Script \texttt{export\_calibration\_from\_m1.py} regenera \texttt{calibration.json} sin abrir Jupyter.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{Del diagnóstico al motor}
-  \centering
-  \begin{tikzpicture}
-    \node[draw, rounded corners, minimum width=8cm, minimum height=2.2cm, align=left, font=\small] {
-      \textbf{Puente M1 $\rightarrow$ M2}\\[0.3em]
-      Excel + notebook $\Rightarrow$ números por zona (cuánta lluvia dispara alerta, sensibilidad, pagos)\\[0.2em]
-      $\Downarrow$\\[0.2em]
-      \texttt{calibration.json}
-    };
-  \end{tikzpicture}
-\end{frame}
 
 % ---------------------------------------------------------------------------
 \section{Insight clave: no es solo demanda}
@@ -189,7 +166,6 @@
   \begin{itemize}
     \item \textbf{Al parecer}, las zonas con perfil más \textbf{rural o periférico} concentran con mayor frecuencia \textbf{anomalías tipo saturación}: distribuciones más anchas y picos extremos (ratio muy alto en ciertas horas), coherentes con episodios de mucha demanda relativa frente a reparto disponible.
     \item Las zonas \textbf{urbanas y residenciales} tienden, en cambio, a que su \textbf{valor máximo habitual} quede \textbf{dentro del rango esperado} antes del umbral de saturación del panel: menos cola hacia valores extremos en el histórico mostrado.
-    \item \textbf{Matiz:} conviene validar con el notebook y con la definición operativa de cada zona (no sustituye un estudio urbano formal).
   \end{itemize}
 \end{frame}
 
@@ -213,13 +189,6 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Mapas: ¿de dónde sale el punto del tiempo?}
-  \begin{itemize}
-    \item Cada zona tiene un polígono en el Excel; se usa geometría (\textbf{Shapely}) para elegir un punto \textbf{dentro} del polígono cuando el mapa es válido.
-    \item Si el polígono viene mal, se usan las coordenadas de respaldo de \texttt{ZONE\_INFO}.
-    \item Opcional: más puntos por rejilla para escenarios finos (\texttt{geo\_pipeline}).
-  \end{itemize}
-\end{frame}
 
 \begin{frame}{Qué hace el motor (pasos sencillos)}
   \small
@@ -236,18 +205,7 @@
   \begin{itemize}
     \item Se guarda un \textbf{estado por zona} (archivo local).
     \item No se repite el \textbf{mismo tipo de aviso} en poco tiempo (por defecto unos \textbf{45 minutos}), salvo que la situación \textbf{empeore de verdad} o suba mucho el \textbf{nivel de riesgo}.
-    \item Ese tiempo se puede cambiar con \texttt{ALERT\_DEBOUNCE\_TTL\_SEC} en \texttt{.env}.
     \item \textbf{Extra:} deduplicación del mismo ``evento'' de lluvia y, si se configura, tiempo mínimo entre alertas de \textbf{cualquier} zona (\texttt{ALERT\_GLOBAL\_MIN\_INTERVAL\_SEC}).
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{Umbrales operativos: \texttt{ratio} y lluvia por zona}
-  \small
-  \begin{itemize}
-    \item \textbf{\texttt{ratio}:} saturación del caso a \texttt{ratio} ${>} 1{,}8$; el motor proyecta cómo podría moverse el \texttt{ratio} con la lluvia esperada y asigna \textbf{riesgo} (BAJO $\rightarrow$ CRÍTICO).
-    \item \textbf{Lluvia (\texttt{alert\_precip\_mm\_hr}):} se calcula con \texttt{export\_calibration\_from\_m1.py}; en horas ya saturadas en histórico, percentil 75 de mm/h por zona.
-    \item \textbf{Respaldo 6{,}55 mm/h} si el percentil sale casi cero (muchas saturaciones ``en seco'') para no alertar por ruido.
-    \item Reglas en lenguaje llano: \texttt{motor\_reglas/motor\_reglas.tex} $\rightarrow$ PDF.
   \end{itemize}
 \end{frame}
 
@@ -266,10 +224,9 @@
 \begin{frame}{Módulo 3 — Telegram: mismo motor, texto para humanos}
   \begin{itemize}
     \item Mismo clima y \textbf{mismo motor} que el M2.
-    \item El programa arma un \textbf{resumen en JSON} (zona, riesgo, números); el modelo de lenguaje solo \textbf{redacta} el mensaje. No “busca en Google”: el contenido viene del motor.
+    \item El programa arma un \textbf{resumen en JSON} (zona, riesgo, números); el modelo de lenguaje solo \textbf{redacta} el mensaje.
     \item Puede usarse \textbf{Ollama} en local o \textbf{OpenAI}; con OpenAI, por defecto entra \textbf{LangChain}. Si el modelo falla, hay \textbf{texto fijo} con los mismos datos.
     \item El envío es con \textbf{python-telegram-bot}.
-    \item Resumen en PDF (lenguaje llano): \texttt{modulo3\_agente\_telegram/latex/arquitectura\_agente.tex}.
   \end{itemize}
 \end{frame}
 
@@ -283,68 +240,15 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Configuración y cuidado con el token}
-  \begin{itemize}
-    \item En \texttt{caso\_tecnico/.env}: token del bot y chat/canal (\texttt{TELEGRAM\_*}).
-    \item El bot debe poder \textbf{publicar} en el canal.
-    \item \textbf{No subir el token al repositorio.} Si se filtra, revocar en BotFather.
-  \end{itemize}
-\end{frame}
 
-\begin{frame}{Comandos útiles en demo}
-  \small
-  Desde la raíz \texttt{caso\_tecnico/}:
-  \vspace{0.4em}
-  \begin{block}{Pruebas}
-    \texttt{python modulo3\_agente\_telegram/run\_agent.py --test-telegram}\\[0.2em]
-    \texttt{python modulo3\_agente\_telegram/run\_agent.py --demo --dry-run}\\[0.2em]
-    \texttt{python modulo3\_agente\_telegram/run\_agent.py --demo --validate}
-  \end{block}
-  \begin{block}{Enviar de verdad al canal}
-    \texttt{python modulo3\_agente\_telegram/run\_agent.py --demo --force-send}
-  \end{block}
-\end{frame}
-
-\begin{frame}{Extras opcionales}
-  \begin{itemize}
-    \item Si el motor \textbf{silencia} un aviso por debounce, puede mandarse un \textbf{aviso corto} (salvo prueba en seco con \texttt{--dry-run}).
-    \item Queda registro de envíos en archivos locales (\texttt{.alert\_events.jsonl}).
-    \item \textbf{Resumen del día:} lista de eventos y comparación con la lluvia registrada; se puede programar con \textbf{cron} (ver README del módulo 3).
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{Monitor que se ejecuta solo}
-  \small
-  \begin{itemize}
-    \item Script \texttt{monitor\_loop.py}: cada cierto tiempo vuelve a consultar el clima, pasa por el motor y, si toca, prepara Telegram.
-    \item Por defecto el intervalo es \textbf{10 minutos} (configurable; no confundir con el tiempo entre avisos repetidos, que es el debounce).
-    \item Los ciclos se guardan en archivos que también lee el \textbf{dashboard web} (\texttt{/monitor/}).
-  \end{itemize}
-  \vspace{0.25em}
-  \footnotesize
-  Prueba rápida: \texttt{python modulo3\_agente\_telegram/monitor\_loop.py --once --demo --dry-run}
-\end{frame}
-
-\begin{frame}{Dos tiempos distintos (no mezclar)}
+\begin{frame}{Dos tiempos distintos}
   \begin{itemize}
     \item \textbf{Cada cuánto se mira el clima} (monitor): p.\,ej. cada 10 min.
-    \item \textbf{Cada cuánto se puede repetir} un aviso parecido en la misma zona (debounce): p.\,ej. $\sim$45 min.
+    \item \textbf{Cada cuánto se puede repetir} un aviso parecido en la misma zona: p.\,ej. $\sim$45 min.
     \item Si el \textbf{riesgo sube de nivel}, puede avisarse antes aunque no haya pasado el tiempo largo.
   \end{itemize}
 \end{frame}
 
-% ---------------------------------------------------------------------------
-\section{Limitaciones}
-
-\begin{frame}{Qué \emph{no} afirma este caso}
-  \small
-  \begin{itemize}
-    \item \textbf{No hay causalidad pura:} regresiones y correlaciones en un panel fijo describen \textbf{asociaciones} condicionadas; no sustituyen A/B tests, instrumentos ni datos de operación en tiempo real completos.
-    \item \textbf{Sin NPS ni experiencia cliente:} no entran cancelaciones, tiempos por etapa, ni satisfacción; conviene cruzar con esos KPIs antes de decisiones fuertes de producto o pricing.
-    \item \textbf{Extracto y ciudad acotados:} un mes y 14 zonas; recalibrar al cambiar mercado, estación o definición de polígonos.
-    \item \textbf{Clima y pronóstico:} Open-Meteo puede equivocarse; los umbrales y el debounce mitigan ruido pero no eliminan incertidumbre meteorológica.
-  \end{itemize}
-\end{frame}
 
 % ---------------------------------------------------------------------------
 \section{Extensión futura}
@@ -357,40 +261,12 @@
   \end{itemize}
 \end{frame}
 
-% ---------------------------------------------------------------------------
-\section{Observabilidad y auditoría}
 
-\begin{frame}{Trazas locales (auditoría)}
-  \small
-  \begin{itemize}
-    \item \textbf{\texttt{.ops\_audit.jsonl}} (M2): decisiones del motor, debounce, fallos de clima — útil para depurar.
-    \item \textbf{\texttt{.alert\_events.jsonl}}: una línea por cada alerta \textbf{enviada} a Telegram (no dry-run).
-    \item \textbf{\texttt{.monitor\_ticks.jsonl}} / \textbf{\texttt{.monitor\_status.json}}: ciclos del \texttt{monitor\_loop} para el panel web.
-    \item No van al git; viven bajo \texttt{modulo2\_motor\_alertas/}.
-  \end{itemize}
-\end{frame}
-
-% ---------------------------------------------------------------------------
-\section{Cierre}
-
-\begin{frame}{Mitigaciones operativas (demo y producción)}
-  \small
-  \begin{itemize}
-    \item \textbf{Clima errático:} umbrales por zona + criterio humano; debounce reduce spam sin bloquear escaladas de riesgo.
-    \item \textbf{Demasiados mensajes:} avisos cortos cuando el motor silencia por TTL; subida real de riesgo puede pasar antes.
-    \item \textbf{Otra ciudad o periodo:} nuevo Excel, nueva calibración, mismo código y documentación de reglas.
-  \end{itemize}
-  \vspace{0.3em}
-  \footnotesize
-  Guías: \texttt{docs/criterios\_evaluacion\_demo.md}, \texttt{modulo3\_agente\_telegram/docs/qa\_arquitectura.md}.
-\end{frame}
 
 \begin{frame}{}
   \centering
   {\Huge Gracias}
 
-  \vspace{1.2em}
-  {\large Preguntas}
 \end{frame}
 
 \end{document}
